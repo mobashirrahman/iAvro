@@ -5,18 +5,25 @@ PODS:
   - RegexKitLite (4.0)
 
 DEPENDENCIES:
-  - FMDB (~> 2.1)
-  - RegexKitLite (~> 4.0)
+  - FMDB (from `https://github.com/ccgus/fmdb.git`, tag `2.7.5`)
+  - RegexKitLite (from `RegexKitLite.podspec`)
 
-SPEC REPOS:
-  https://github.com/cocoapods/specs.git:
-    - FMDB
-    - RegexKitLite
+EXTERNAL SOURCES:
+  FMDB:
+    :git: https://github.com/ccgus/fmdb.git
+    :tag: 2.7.5
+  RegexKitLite:
+    :podspec: RegexKitLite.podspec
+
+CHECKOUT OPTIONS:
+  FMDB:
+    :git: https://github.com/ccgus/fmdb.git
+    :tag: 2.7.5
 
 SPEC CHECKSUMS:
-  FMDB: 2ce00b547f966261cd18927a3ddb07cb6f3db82a
-  RegexKitLite: c0e4c12e6e7de0769f3a3ed679f0f61604170661
+  FMDB: f0f86bc4f075abe173d99545a0794125407f8b49
+  RegexKitLite: 2c8600af623d0052e2f8cf0b93af2f01b92ef3b4
 
-PODFILE CHECKSUM: 5acf89e667c8a2413ccf87dcbc6c7740d01c8708
+PODFILE CHECKSUM: 97682b42cc0289c6a70fcb0e4b55d4ea744cffc3
 
-COCOAPODS: 1.5.3
+COCOAPODS: 1.16.2
