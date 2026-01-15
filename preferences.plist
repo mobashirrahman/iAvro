@@ -8,5 +8,7 @@
 	<false/>
 	<key>IncludeDictionary</key>
 	<true/>
+	<key>ShowInlineBangla</key>
+	<true/>
 </dict>
 </plist>

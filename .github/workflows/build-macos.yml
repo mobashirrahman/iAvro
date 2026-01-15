@@ -1,0 +1,56 @@
+name: Build macOS Input Method
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: macos-13
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: actions/setup-ruby@v1
+        with:
+          ruby-version: "3.1"
+
+      - name: Install CocoaPods
+        run: gem install cocoapods
+
+      - name: Install Pods
+        run: pod install
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace AvroKeyboard.xcworkspace \
+            -scheme "Avro Keyboard" \
+            -configuration Release \
+            -sdk macosx \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package App
+        run: |
+          set -euo pipefail
+          APP_PATH="build/Build/Products/Release/Avro Keyboard.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "App not found at $APP_PATH"
+            find build -maxdepth 5 -name "*.app"
+            exit 1
+          fi
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "AvroKeyboard-macOS.zip"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AvroKeyboard-macOS
+          path: AvroKeyboard-macOS.zip

@@ -9,6 +9,8 @@
 #import "AutoCorrect.h"
 #import "AutoCorrectItem.h"
 
+static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
+
 @implementation PreferencesController
 
 @synthesize autoCorrectItemsArray = _autoCorrectItemsArray;
@@ -40,6 +42,8 @@
 	[[self window] setContentSize:[_generalView frame].size];
     [[[self window] contentView] addSubview:_generalView];
     [[[self window] contentView] setWantsLayer:YES];
+
+    [self addInlineBanglaPreferenceToggle];
     
     // Load Credits
     [_aboutContent readRTFDFromFile:[[NSBundle mainBundle] pathForResource:@"Credits" ofType:@"rtfd"]];
@@ -109,6 +113,26 @@
         predicate = [NSPredicate predicateWithFormat:@"(replace CONTAINS[c] %@) OR (with CONTAINS %@)", searchTerm, searchTerm];
     }
     [_autoCorrectController setFilterPredicate:predicate];
+}
+
+- (void)addInlineBanglaPreferenceToggle {
+    if (!_generalView) {
+        return;
+    }
+
+    NSRect frame = NSMakeRect(198.0, 0.0, 250.0, 18.0);
+    NSButton *inlineToggle = [[NSButton alloc] initWithFrame:frame];
+    [inlineToggle setButtonType:NSSwitchButton];
+    [inlineToggle setTitle:@"Show Bengali inline while typing"];
+    [inlineToggle setBezelStyle:NSBezelStyleRegularSquare];
+    [inlineToggle setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
+    [inlineToggle bind:@"value"
+              toObject:[NSUserDefaultsController sharedUserDefaultsController]
+           withKeyPath:[NSString stringWithFormat:@"values.%@", kShowInlineBanglaDefaultsKey]
+               options:nil];
+
+    [_generalView addSubview:inlineToggle];
+    [inlineToggle release];
 }
 
 @end

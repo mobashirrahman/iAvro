@@ -14,6 +14,12 @@
 #import "AvroParser.h"
 #import "AutoCorrect.h"
 
+static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
+
+@interface AvroKeyboardController ()
+- (NSString *)compositionDisplayString;
+@end
+
 @implementation AvroKeyboardController
 
 @synthesize prefix = _prefix, term = _term, suffix = _suffix;
@@ -155,7 +161,8 @@
 }
 
 - (void)commitComposition:(id)sender {
-	[sender insertText:_composedBuffer replacementRange:NSMakeRange(NSNotFound, 0)];
+	NSString *commitString = [self compositionDisplayString];
+	[sender insertText:commitString replacementRange:NSMakeRange(NSNotFound, 0)];
 	
 	[self clearCompositionBuffer];
 	[_currentCandidates removeAllObjects];
@@ -163,11 +170,31 @@
 }
 
 - (id)composedString:(id)sender {
-	return [[[NSAttributedString alloc] initWithString:_composedBuffer] autorelease];
+	NSString *displayString = [self compositionDisplayString];
+	return [[[NSAttributedString alloc] initWithString:displayString] autorelease];
 }
 
 - (void)clearCompositionBuffer {
 	[_composedBuffer deleteCharactersInRange:NSMakeRange(0, [_composedBuffer length])];	
+}
+
+- (NSString *)compositionDisplayString {
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:kShowInlineBanglaDefaultsKey]) {
+        return _composedBuffer ? _composedBuffer : @"";
+    }
+
+    if (!_composedBuffer || [_composedBuffer length] == 0) {
+        return @"";
+    }
+
+    if (![self term]) {
+        return [[AvroParser sharedInstance] parse:_composedBuffer];
+    }
+
+    NSString *prefix = [self prefix] ? [self prefix] : @"";
+    NSString *suffix = [self suffix] ? [self suffix] : @"";
+    NSString *parsedTerm = [[AvroParser sharedInstance] parse:[self term]];
+    return [NSString stringWithFormat:@"%@%@%@", prefix, parsedTerm, suffix];
 }
 
 /*
