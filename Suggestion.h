@@ -8,13 +8,18 @@
 #import <Foundation/Foundation.h>
 
 @interface Suggestion : NSObject {
-    NSMutableArray* _suggestions;
+  NSMutableArray *_suggestions;
+  NSDictionary *_emojiEmoticons;
+  NSDictionary *_emojiNamesEn;
+  NSDictionary *_emojiNamesBn;
 }
 
 + (Suggestion *)sharedInstance;
 
-- (NSMutableArray*)getList:(NSString*)term;
-- (BOOL)isKar:(NSString*)letter;
-- (BOOL)isVowel:(NSString*)letter;
+- (NSMutableArray *)getList:(NSString *)term;
+- (BOOL)isKar:(NSString *)letter;
+- (BOOL)isVowel:(NSString *)letter;
+- (NSArray *)emojisForTerm:(NSString *)term
+           withSuggestions:(NSArray *)bnSuggestions;
 
 @end

@@ -16,6 +16,7 @@
 		350CED1C159CF3300009F0FE /* Suggestion.m in Sources */ = {isa = PBXBuildFile; fileRef = 350CED1A159CF3300009F0FE /* Suggestion.m */; };
 		3512ED5A159785400085E81E /* preferences.nib in Resources */ = {isa = PBXBuildFile; fileRef = 3512ED581597853F0085E81E /* preferences.nib */; };
 		3515102D184B99AE00D5059A /* autodict.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3515102C184B99AE00D5059A /* autodict.plist */; };
+		AA000001AAAA000100000001 /* emoji.json in Resources */ = {isa = PBXBuildFile; fileRef = AA000001AAAA000100000002 /* emoji.json */; };
 		3528AA9C1853AFF300B8D51F /* AutoCorrectItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 3528AA9B1853AFF300B8D51F /* AutoCorrectItem.m */; };
 		3553A33515A0009E00FE8491 /* CacheManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 3553A33415A0009E00FE8491 /* CacheManager.m */; };
 		356B186915A445DA00091215 /* AutoCorrect.png in Resources */ = {isa = PBXBuildFile; fileRef = 356B186815A445DA00091215 /* AutoCorrect.png */; };
@@ -60,6 +61,7 @@
 		350CED1A159CF3300009F0FE /* Suggestion.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Suggestion.m; sourceTree = "<group>"; };
 		3512ED591597853F0085E81E /* English */ = {isa = PBXFileReference; lastKnownFileType = wrapper.nib; name = English; path = English.lproj/preferences.nib; sourceTree = "<group>"; };
 		3515102C184B99AE00D5059A /* autodict.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = autodict.plist; sourceTree = "<group>"; };
+		AA000001AAAA000100000002 /* emoji.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = emoji.json; sourceTree = "<group>"; };
 		3528AA9A1853AFF300B8D51F /* AutoCorrectItem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AutoCorrectItem.h; sourceTree = "<group>"; };
 		3528AA9B1853AFF300B8D51F /* AutoCorrectItem.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AutoCorrectItem.m; sourceTree = "<group>"; };
 		3553A33315A0009D00FE8491 /* CacheManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CacheManager.h; sourceTree = "<group>"; };
@@ -181,6 +183,7 @@
 				832F56401F994B6500432D7A /* Images.xcassets */,
 				356B186115A4434D00091215 /* Icons */,
 				3515102C184B99AE00D5059A /* autodict.plist */,
+				AA000001AAAA000100000002 /* emoji.json */,
 				35F4DE72159404A3001EAC81 /* data.json */,
 				350CECE0159C45790009F0FE /* regex.json */,
 				350CECD9159C45790009F0FE /* database.db3 */,
@@ -349,6 +352,7 @@
 				35895BFE1597706800F2A3ED /* MainMenu.nib in Resources */,
 				3512ED5A159785400085E81E /* preferences.nib in Resources */,
 				3515102D184B99AE00D5059A /* autodict.plist in Resources */,
+				AA000001AAAA000100000001 /* emoji.json in Resources */,
 				350CECE5159C45790009F0FE /* database.db3 in Resources */,
 				350CECE9159C45790009F0FE /* regex.json in Resources */,
 				3578E8FD15A26EC100C1FB8E /* Credits.rtfd in Resources */,
