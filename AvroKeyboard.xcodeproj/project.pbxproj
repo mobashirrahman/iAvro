@@ -37,6 +37,7 @@
 		8D11072D0486CEB800E47090 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 29B97316FDCFA39411CA2CEA /* main.m */; settings = {ATTRIBUTES = (); }; };
 		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
 		A49A45DE95DCB21C7E66D8A5 /* libPods-Avro Keyboard.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 37361BFC8512F1D38B7962DD /* libPods-Avro Keyboard.a */; };
+		C6BE383857FD5013D65E9302 /* SettingsKeys.m in Sources */ = {isa = PBXBuildFile; fileRef = BE53712CF0B15B5AB0AE55F8 /* SettingsKeys.m */; };
 		E93074B70A5C264700470842 /* InputMethodKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E93074B60A5C264700470842 /* InputMethodKit.framework */; };
 		E93074E20A5C2F1200470842 /* AvroKeyboardController.m in Sources */ = {isa = PBXBuildFile; fileRef = E93074E10A5C2F1200470842 /* AvroKeyboardController.m */; };
 /* End PBXBuildFile section */
@@ -90,10 +91,12 @@
 		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8D1107320486CEB800E47090 /* Avro Keyboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Avro Keyboard.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		9BE514399134C547D83E8518 /* Pods-Avro Keyboard.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Avro Keyboard.debug.xcconfig"; path = "Pods/Target Support Files/Pods-Avro Keyboard/Pods-Avro Keyboard.debug.xcconfig"; sourceTree = "<group>"; };
+		BE53712CF0B15B5AB0AE55F8 /* SettingsKeys.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SettingsKeys.m; sourceTree = "<group>"; };
 		E93074B60A5C264700470842 /* InputMethodKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = InputMethodKit.framework; path = /System/Library/Frameworks/InputMethodKit.framework; sourceTree = "<absolute>"; };
 		E93074E00A5C2F1200470842 /* AvroKeyboardController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AvroKeyboardController.h; sourceTree = "<group>"; };
 		E93074E10A5C2F1200470842 /* AvroKeyboardController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AvroKeyboardController.m; sourceTree = "<group>"; };
 		F63F96C5EF8B57064296B7BD /* Pods-Avro Keyboard.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Avro Keyboard.release.xcconfig"; path = "Pods/Target Support Files/Pods-Avro Keyboard/Pods-Avro Keyboard.release.xcconfig"; sourceTree = "<group>"; };
+		F77644C04FBD1D7D1A11E894 /* SettingsKeys.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = SettingsKeys.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -123,6 +126,8 @@
 				35DBC86A1597A15B00B9772E /* MainMenuAppDelegate.m */,
 				832F563B1F993C5800432D7A /* IMPreferences.h */,
 				832F563C1F993C5800432D7A /* IMPreferences.m */,
+				F77644C04FBD1D7D1A11E894 /* SettingsKeys.h */,
+				BE53712CF0B15B5AB0AE55F8 /* SettingsKeys.m */,
 			);
 			name = Classes;
 			sourceTree = "<group>";
@@ -153,7 +158,7 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		29B97314FDCFA39411CA2CEA /* NumberInput */ = {
+		29B97314FDCFA39411CA2CEA = {
 			isa = PBXGroup;
 			children = (
 				080E96DDFE201D6D7F000001 /* Classes */,
@@ -328,7 +333,7 @@
 				en,
 				English,
 			);
-			mainGroup = 29B97314FDCFA39411CA2CEA /* NumberInput */;
+			mainGroup = 29B97314FDCFA39411CA2CEA;
 			productRefGroup = 19C28FACFE9D520D11CA2CBB /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -401,6 +406,7 @@
 				3553A33515A0009E00FE8491 /* CacheManager.m in Sources */,
 				3528AA9C1853AFF300B8D51F /* AutoCorrectItem.m in Sources */,
 				35B6EE6D15A0C4F2004C7C9B /* NSString+Levenshtein.m in Sources */,
+				C6BE383857FD5013D65E9302 /* SettingsKeys.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -154,6 +154,8 @@ static Database *sharedInstance = nil;
                 forKey:[results stringForColumn:@"English"]];
   }
   [results close];
+  // Manual addition for missing suffix "ch" mapping to Bangla "ছ"
+  [_suffix setObject:@"ছ" forKey:@"ch"];
   // Manual addition for missing suffix "oto" mapping to Bangla "ট"
   [_suffix setObject:@"ট" forKey:@"oto"];
 }
