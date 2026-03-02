@@ -760,6 +760,11 @@
             "rules": []
         },
         {
+            "find": "TH",
+            "replace": "ৎ",
+            "rules": []
+        },
+        {
             "find": "Th",
             "replace": "ঠ",
             "rules": []
@@ -1817,6 +1822,11 @@
             "rules": []
         },
         {
+            "find": "H",
+            "replace": "ঃ",
+            "rules": []
+        },
+        {
             "find": "h",
             "replace": "হ",
             "rules": []
@@ -1940,6 +1950,11 @@
         {
             "find": "p",
             "replace": "প",
+            "rules": []
+        },
+        {
+            "find": "qq",
+            "replace": "ঁ",
             "rules": []
         },
         {
@@ -2142,6 +2157,6 @@
     ],
     "vowel": "aeiou",
     "consonant": "bcdfghjklmnpqrstvwxyz",
-    "casesensitive": "oiudDgjnrstyz",
+    "casesensitive": "oiudDgjnrstyzh",
     "number": "1234567890"
 }

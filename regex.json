@@ -592,7 +592,7 @@
     },
     {
       "find": "qq",
-      "replace": "(ক্?ক?)",
+      "replace": "ঁ",
       "rules": []
     },
     {
