@@ -9,6 +9,8 @@
 
 @interface AutoCorrect : NSObject {
     NSMutableDictionary* _autoCorrectEntries;
+    NSDictionary* _bundledEntries;
+    NSMutableDictionary* _userEntries;
 }
 
 @property (retain) NSMutableDictionary* autoCorrectEntries;
@@ -18,5 +20,9 @@
 - (NSString*)find:(NSString*)term;
 - (NSMutableDictionary*)autoCorrectEntries;
 - (void)setAutoCorrectEntries:(NSMutableDictionary *)autoCorrectEntries;
+
+// User entries overlay Application Support storage (bundle stays pristine).
+- (void)setUserAutoCorrect:(NSString *)correction forTerm:(NSString *)term;
+- (void)removeUserAutoCorrectForTerm:(NSString *)term;
 
 @end

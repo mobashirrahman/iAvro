@@ -17,8 +17,9 @@
 - (id)init {
   self = [super init];
   if (self) {
-    NSMutableDictionary *autoCorrectEntries =
-        [[AutoCorrect sharedInstance] autoCorrectEntries];
+    // Snapshot: never enumerate the singleton's live mutable dictionary.
+    NSDictionary *autoCorrectEntries =
+        [[[[AutoCorrect sharedInstance] autoCorrectEntries] copy] autorelease];
     _autoCorrectItemsArray = [[NSMutableArray alloc] init];
     for (id key in autoCorrectEntries) {
       AutoCorrectItem *item = [[AutoCorrectItem alloc] init];
