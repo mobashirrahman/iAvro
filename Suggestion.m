@@ -100,22 +100,26 @@ static Suggestion *sharedInstance = nil;
           // dictionary entry
           NSString *autoCorrect = [[AutoCorrect sharedInstance] find:term];
           if (autoCorrect && [dicList containsObject:autoCorrect]) {
-            [_suggestions removeObjectIdenticalTo:autoCorrect];
+            [_suggestions removeObject:autoCorrect];
           }
-          // Sort dicList based on edit distance
+          // Compute each edit distance once, then sort by cached value
+          NSMutableDictionary *distances =
+              [NSMutableDictionary dictionaryWithCapacity:[dicList count]];
+          for (NSString *word in dicList) {
+            int dist = [paresedString computeLevenshteinDistanceWithString:word];
+            [distances setObject:[NSNumber numberWithInt:dist] forKey:word];
+          }
           NSArray *sortedDicList = [dicList
               sortedArrayUsingComparator:^NSComparisonResult(id left,
                                                              id right) {
-                int dist1 = [paresedString
-                    computeLevenshteinDistanceWithString:(NSString *)left];
-                int dist2 = [paresedString
-                    computeLevenshteinDistanceWithString:(NSString *)right];
+                int dist1 = [[distances objectForKey:left] intValue];
+                int dist2 = [[distances objectForKey:right] intValue];
                 if (dist1 < dist2) {
                   return NSOrderedAscending;
                 } else if (dist1 > dist2) {
                   return NSOrderedDescending;
                 } else {
-                  return NSOrderedSame;
+                  return [(NSString *)left compare:(NSString *)right];
                 }
               }];
           [_suggestions addObjectsFromArray:sortedDicList];

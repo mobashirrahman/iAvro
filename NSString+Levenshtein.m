@@ -12,7 +12,7 @@
 @implementation NSString (Levenshtein)
 
 /// minimum between three values
-int minimum(int a,int b,int c)
+static int minimum(int a,int b,int c)
 {
 	int min=a;
 	if(b<min)
@@ -25,37 +25,48 @@ int minimum(int a,int b,int c)
 
 -(int) computeLevenshteinDistanceWithString:(NSString *) string
 {
-	int *d; // distance vector
-	int i,j,k; // indexes
-	int cost, distance;
-	
 	int n = (int)[self length];
-	int m = (int)[string length];
-	
-	if( n!=0 && m!=0 ){
-		
-		d = malloc( sizeof(int) * (++n) * (++m) );
-		
-		for( k=0 ; k<n ; k++ )
-			d[k] = k;
-		for( k=0 ; k<m ; k++ )
-			d[k*n] = k;
-		
-		for( i=1; i<n ; i++ ) {
-			for( j=1 ;j<m ; j++ ) {
-				if( [self characterAtIndex:i-1]  == [string characterAtIndex:j-1])
-					cost = 0;
-				else
-					cost = 1;
-				d[j*n+i]=minimum(d[(j-1)*n+i]+1,d[j*n+i-1]+1,d[(j-1)*n+i-1]+cost);
-			}
-		}
-		distance = d[n*m-1];
-		free(d);
-		return distance;
+	int m = (int)(string ? [string length] : 0);
+
+	if (n == 0) {
+		return m;
 	}
-	
-	return -1; // error
+	if (m == 0) {
+		return n;
+	}
+
+	int *prev = malloc(sizeof(int) * (m + 1));
+	int *curr = malloc(sizeof(int) * (m + 1));
+	if (!prev || !curr) {
+		free(prev);
+		free(curr);
+		return (n > m) ? n : m;
+	}
+
+	int i, j, cost;
+	for (j = 0; j <= m; j++) {
+		prev[j] = j;
+	}
+
+	for (i = 1; i <= n; i++) {
+		curr[0] = i;
+		unichar selfChar = [self characterAtIndex:i - 1];
+		for (j = 1; j <= m; j++) {
+			if (selfChar == [string characterAtIndex:j - 1])
+				cost = 0;
+			else
+				cost = 1;
+			curr[j] = minimum(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+		}
+		int *tmp = prev;
+		prev = curr;
+		curr = tmp;
+	}
+
+	int distance = prev[m];
+	free(prev);
+	free(curr);
+	return distance;
 }
 
 
