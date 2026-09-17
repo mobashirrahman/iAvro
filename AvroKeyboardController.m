@@ -293,7 +293,10 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
 }
 
 - (void)deleteBackward:(id)sender {
-    // We're called only when [compositionBuffer length] > 0
+    // We're called only when [compositionBuffer length] > 0, but guard anyway
+    if (!_composedBuffer || [_composedBuffer length] == 0) {
+        return;
+    }
     [_composedBuffer deleteCharactersInRange:NSMakeRange([_composedBuffer length] - 1, 1)];
     [self findCurrentCandidates];
     [self updateComposition];

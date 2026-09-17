@@ -161,6 +161,9 @@ static Database *sharedInstance = nil;
 }
 
 - (NSArray *)find:(NSString *)term {
+  if (!term || [term length] == 0) {
+    return [NSArray array];
+  }
   // Left Most Character
   unichar lmc = [[term lowercaseString] characterAtIndex:0];
   NSString *regex = [NSString

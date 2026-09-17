@@ -135,7 +135,7 @@ static Suggestion *sharedInstance = nil;
       for (i = [term length] - 1; i > 0; --i) {
         NSString *suffix = [[Database sharedInstance]
             banglaForSuffix:[[term substringFromIndex:i] lowercaseString]];
-        if (suffix) {
+        if (suffix && [suffix length] > 0) {
           NSString *base = [term substringToIndex:i];
           NSArray *cached = [[CacheManager sharedInstance] arrayForKey:base];
           NSString *selected;
@@ -146,6 +146,9 @@ static Suggestion *sharedInstance = nil;
           // This should always exist, so it's just a safety check
           if (cached) {
             for (NSString *item in cached) {
+              if (!item || [item length] == 0) {
+                continue;
+              }
               // Skip AutoCorrect English Entry
               if ([base isEqualToString:item]) {
                 continue;
