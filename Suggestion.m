@@ -68,9 +68,10 @@ static Suggestion *sharedInstance = nil;
   [super dealloc];
 }
 
-- (NSMutableArray *)getList:(NSString *)term {
-  if (term && [term length] == 0) {
-    return _suggestions;
+- (NSArray *)getList:(NSString *)term {
+  [_suggestions removeAllObjects];
+  if (!term || [term length] == 0) {
+    return [[_suggestions copy] autorelease];
   }
 
   // Suggestions from Default Parser
@@ -204,7 +205,7 @@ static Suggestion *sharedInstance = nil;
     [_suggestions addObject:paresedString];
   }
 
-  return _suggestions;
+  return [[_suggestions copy] autorelease];
 }
 
 - (BOOL)isKar:(NSString *)letter {

@@ -50,7 +50,8 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
 }
 
 - (void)findCurrentCandidates {
-    [_currentCandidates removeAllObjects];
+    [_currentCandidates release];
+    _currentCandidates = [[NSMutableArray alloc] initWithCapacity:0];
     if (_composedBuffer && [_composedBuffer length] > 0) {
         NSString* regex = @"(^(?::`|\\.`|[-\\]\\\\~!@#&*()_=+\\[{}'\";<>/?|.,])*?(?=(?:,{2,}))|^(?::`|\\.`|[-\\]\\\\~!@#&*()_=+\\[{}'\";<>/?|.,])*)(.*?(?:,,)*)((?::`|\\.`|[-\\]\\\\~!@#&*()_=+\\[{}'\";<>/?|.,])*$)";
         NSArray* items = [_composedBuffer captureComponentsMatchedByRegex:regex];
@@ -60,7 +61,9 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
             [self setTerm:[items objectAtIndex:2]];
             [self setSuffix:[[AvroParser sharedInstance] parse:[items objectAtIndex:3]]];
             
-            _currentCandidates = [[[Suggestion sharedInstance] getList:[self term]] retain];
+            NSArray *freshList = [[Suggestion sharedInstance] getList:[self term]];
+            [_currentCandidates release];
+            _currentCandidates = [freshList mutableCopy];
             if (_currentCandidates && [_currentCandidates count] > 0) {
                 NSString* prevString = nil;
                 if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
