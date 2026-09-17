@@ -122,8 +122,16 @@
   [_autoCorrectController setFilterPredicate:predicate];
 }
 
+static const NSInteger kInlineBanglaToggleTag = 1001;
+static const NSInteger kAutoCorrectToggleTag = 1002;
+static const NSInteger kSuggestionToggleTag = 1003;
+
 - (void)addInlineBanglaPreferenceToggle {
   if (!_generalView) {
+    return;
+  }
+  // awakeFromNib can run more than once; don't stack duplicates.
+  if ([_generalView viewWithTag:kInlineBanglaToggleTag]) {
     return;
   }
 
@@ -139,6 +147,7 @@
                                                 kShowInlineBanglaDefaultsKey]
              options:nil];
 
+  [inlineToggle setTag:kInlineBanglaToggleTag];
   [_generalView addSubview:inlineToggle];
   [inlineToggle release];
 }
@@ -147,9 +156,13 @@
   if (!_generalView) {
     return;
   }
+  if ([_generalView viewWithTag:kAutoCorrectToggleTag]) {
+    return;
+  }
 
   NSRect frame = NSMakeRect(198.0, 24.0, 250.0, 18.0);
   NSButton *toggle = [[NSButton alloc] initWithFrame:frame];
+  [toggle setTag:kAutoCorrectToggleTag];
   [toggle setButtonType:NSSwitchButton];
   [toggle setTitle:@"Enable AutoCorrect"];
   [toggle setBezelStyle:NSBezelStyleRegularSquare];
@@ -168,9 +181,13 @@
   if (!_generalView) {
     return;
   }
+  if ([_generalView viewWithTag:kSuggestionToggleTag]) {
+    return;
+  }
 
   NSRect frame = NSMakeRect(198.0, 48.0, 250.0, 18.0);
   NSButton *toggle = [[NSButton alloc] initWithFrame:frame];
+  [toggle setTag:kSuggestionToggleTag];
   [toggle setButtonType:NSSwitchButton];
   [toggle setTitle:@"Enable Suggestions"];
   [toggle setBezelStyle:NSBezelStyleRegularSquare];
