@@ -276,7 +276,10 @@ static RegexParser* sharedInstance = nil;
 
 - (BOOL)isExact:(NSString*) needle heystack:(NSString*)heystack start:(int)start end:(int)end not:(BOOL)not {
     int len = end - start;
-    return ((start >= 0 && end < [heystack length] 
+    if (len < 0) {
+        return (NO ^ not);
+    }
+    return ((start >= 0 && end <= (int)[heystack length]
              && [[heystack substringWithRange:NSMakeRange(start, len)] isEqualToString:needle]) ^ not);
 }
 
