@@ -34,6 +34,7 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
         _composedBuffer = [[NSMutableString alloc] initWithString:@""];
         _currentCandidates = [[NSMutableArray alloc] initWithCapacity:0];
         _prevSelected = -1;
+        _selectedCandidateIndex = 0;
         _usedArrowKeys = false;
     }
 
@@ -53,6 +54,8 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
 - (void)findCurrentCandidates {
     [_currentCandidates release];
     _currentCandidates = [[NSMutableArray alloc] initWithCapacity:0];
+    _prevSelected = -1;
+    _selectedCandidateIndex = 0;
     if (_composedBuffer && [_composedBuffer length] > 0) {
         NSString* regex = @"(^(?::`|\\.`|[-\\]\\\\~!@#&*()_=+\\[{}'\";<>/?|.,])*?(?=(?:,{2,}))|^(?::`|\\.`|[-\\]\\\\~!@#&*()_=+\\[{}'\";<>/?|.,])*)(.*?(?:,,)*)((?::`|\\.`|[-\\]\\\\~!@#&*()_=+\\[{}'\";<>/?|.,])*$)";
         NSArray* items = [_composedBuffer captureComponentsMatchedByRegex:regex];
@@ -74,20 +77,28 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
                 int i;
                 for (i = 0; i < [_currentCandidates count]; ++i) {
                     NSString* item = [_currentCandidates objectAtIndex:i];
-                    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"] && 
-                        _prevSelected && [item isEqualToString:prevString] ) {
+                    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"] &&
+                        _prevSelected == -1 && prevString && [item isEqualToString:prevString] ) {
                         _prevSelected = i;
                     }
                     [_currentCandidates replaceObjectAtIndex:i withObject:
                      [NSString stringWithFormat:@"%@%@%@", [self prefix], item, [self suffix]]];
                 }
-                // Emoticons                
-                if ([_composedBuffer isEqualToString:[self term]] == NO && 
+                // Emoticons
+                if ([_composedBuffer isEqualToString:[self term]] == NO &&
                     [[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
                     NSString* smily = [[AutoCorrect sharedInstance] find:_composedBuffer];
                     if (smily) {
                         [_currentCandidates insertObject:smily atIndex:0];
+                        if (_prevSelected >= 0) {
+                            _prevSelected += 1;
+                        }
                     }
+                }
+                if (_prevSelected >= 0 && _prevSelected < [_currentCandidates count]) {
+                    _selectedCandidateIndex = _prevSelected;
+                } else {
+                    _selectedCandidateIndex = 0;
                 }
             }
             else {
@@ -260,11 +271,15 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
     // other words the system will not deliver a key down event to the application.
     // Returning NO means the original key down will be passed on to the client.
     if ([string isEqualToString:@" "]) {
-        if (_currentCandidates && [_currentCandidates count]) {
+        if (_currentCandidates && [_currentCandidates count] > 0) {
             // IMKCandidates:selectedCandidateString returns null for some reason, so null is commited when user presses enter.
             // Temporary fix for macOS sierra, use our own _selectedCandidateIndex instead.
             // TODO: Figure out why IMKCandidates:selectedCandidateString isn't working.
-            [self candidateSelected:_currentCandidates[_selectedCandidateIndex]];
+            NSUInteger safeIndex = _selectedCandidateIndex;
+            if (safeIndex >= [_currentCandidates count]) {
+                safeIndex = 0;
+            }
+            [self candidateSelected:[_currentCandidates objectAtIndex:safeIndex]];
         }
         return NO;
     }
@@ -352,8 +367,12 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
 }
 
 - (void)commitText:(NSString*)string {
-    if (_currentCandidates) {
-        [self candidateSelected:_currentCandidates[_selectedCandidateIndex]];
+    if (_currentCandidates && [_currentCandidates count] > 0) {
+        NSUInteger safeIndex = _selectedCandidateIndex;
+        if (safeIndex >= [_currentCandidates count]) {
+            safeIndex = 0;
+        }
+        [self candidateSelected:[_currentCandidates objectAtIndex:safeIndex]];
         [_currentClient insertText:string replacementRange:NSMakeRange(NSNotFound, 0)];
     }
     else {
