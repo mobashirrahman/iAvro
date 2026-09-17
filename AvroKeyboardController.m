@@ -18,6 +18,7 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
 
 @interface AvroKeyboardController ()
 - (NSString *)compositionDisplayString;
+- (NSString *)stringFromCandidate:(id)candidate;
 @end
 
 @implementation AvroKeyboardController
@@ -124,32 +125,64 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
     }
 }
 
-- (NSArray*)candidates:(id)sender {
-	return _currentCandidates;	
+- (NSString *)stringFromCandidate:(id)candidate {
+    if (!candidate) {
+        return nil;
+    }
+    if ([candidate isKindOfClass:[NSAttributedString class]]) {
+        return [(NSAttributedString *)candidate string];
+    }
+    if ([candidate isKindOfClass:[NSString class]]) {
+        return (NSString *)candidate;
+    }
+    return nil;
 }
 
-- (void)candidateSelectionChanged:(NSAttributedString*)candidateString {
+- (NSArray*)candidates:(id)sender {
+	return [[_currentCandidates copy] autorelease];
+}
+
+- (void)candidateSelectionChanged:(id)candidate {
+    NSString *candidateText = [self stringFromCandidate:candidate];
+    if (!candidateText) {
+        return;
+    }
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
-        if ([self term] && [[self term] length] > 0) {
-            BOOL comp = [[candidateString string] isEqualToString:[_currentCandidates objectAtIndex:0]];
+        if ([self term] && [[self term] length] > 0 && [_currentCandidates count] > 0) {
+            NSString *firstCandidate = [_currentCandidates objectAtIndex:0];
+            if (![firstCandidate isKindOfClass:[NSString class]]) {
+                firstCandidate = [self stringFromCandidate:firstCandidate];
+            }
+            BOOL comp = [candidateText isEqualToString:firstCandidate];
             if ((comp && _prevSelected == -1) == NO) {
-                NSRange range = NSMakeRange([[self prefix] length], 
-                                            [candidateString length] - ([[self prefix] length] + [[self suffix] length]));
-                [[CacheManager sharedInstance] setString:[[candidateString string] substringWithRange:range] forKey:[self term]];
-                
+                NSUInteger prefixLen = [[self prefix] length];
+                NSUInteger suffixLen = [[self suffix] length];
+                if (prefixLen + suffixLen <= [candidateText length]) {
+                    NSRange range = NSMakeRange(prefixLen,
+                                                [candidateText length] - (prefixLen + suffixLen));
+                    [[CacheManager sharedInstance] setString:[candidateText substringWithRange:range] forKey:[self term]];
+                }
+
                 // Reverse Suffix Caching
-                NSArray* tmpArray = [[CacheManager sharedInstance] baseForKey:[candidateString string]];
+                NSArray* tmpArray = [[CacheManager sharedInstance] baseForKey:candidateText];
                 if (tmpArray && [tmpArray count] > 0) {
                     [[CacheManager sharedInstance] setString:[tmpArray objectAtIndex:1] forKey:[tmpArray objectAtIndex:0]];
                 }
             }
         }
     }
-    _selectedCandidateIndex = [_currentCandidates indexOfObject:candidateString.string];
+    NSUInteger found = [_currentCandidates indexOfObject:candidateText];
+    if (found != NSNotFound) {
+        _selectedCandidateIndex = found;
+    }
 }
 
-- (void)candidateSelected:(NSAttributedString*)candidateString {
-    [_currentClient insertText:candidateString replacementRange:NSMakeRange(NSNotFound, 0)];
+- (void)candidateSelected:(id)candidate {
+    NSString *candidateText = [self stringFromCandidate:candidate];
+    if (!candidateText) {
+        return;
+    }
+    [_currentClient insertText:candidateText replacementRange:NSMakeRange(NSNotFound, 0)];
 	
 	[self clearCompositionBuffer];
 	[_currentCandidates removeAllObjects];
