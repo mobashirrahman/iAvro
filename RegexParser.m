@@ -295,6 +295,9 @@ static RegexParser* sharedInstance = nil;
         if (![self isCaseSensitive:c]) {
             [fixed appendFormat:@"%C", [self smallCap:c]];
         }
+        else {
+            [fixed appendFormat:@"%C", c];
+        }
     }
     [fixed autorelease];
     return fixed;
