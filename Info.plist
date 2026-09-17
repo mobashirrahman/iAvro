@@ -11,7 +11,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>«PROJECTNAME»</string>
+	<string>Avro Keyboard</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -24,8 +24,8 @@
 	<string>Avro_Keyboard_Connection</string>
 	<key>InputMethodServerControllerClass</key>
 	<string>AvroKeyboardController</string>
-	<key>LSBackgroundOnly</key>
-	<string>1</string>
+	<key>LSUIElement</key>
+	<true/>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
