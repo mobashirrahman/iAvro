@@ -13,6 +13,7 @@
 		NSString*           _number;
 		NSString*           _casesensitive;
 		NSArray*            _patterns;
+		NSDictionary*       _patternDict;
 		NSInteger           _maxPatternLength;
 }
 
