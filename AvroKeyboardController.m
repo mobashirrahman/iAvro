@@ -194,16 +194,14 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
         return;
     }
     [_currentClient insertText:candidateText replacementRange:NSMakeRange(NSNotFound, 0)];
-	
+
 	[self clearCompositionBuffer];
 	[_currentCandidates removeAllObjects];
     [self updateCandidatesPanel];
-    
-    if (_usedArrowKeys) {
-        _usedArrowKeys = false;
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
-            [[CacheManager sharedInstance] persist];
-        }
+
+    _usedArrowKeys = false;
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
+        [[CacheManager sharedInstance] persist];
     }
 }
 

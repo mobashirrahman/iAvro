@@ -65,6 +65,9 @@ static CacheManager* sharedInstance = nil;
         
         if ([fileManager fileExistsAtPath:path]) {
             _weightCache = [[NSMutableDictionary alloc] initWithContentsOfFile:path];
+            if (!_weightCache) {
+                _weightCache = [[NSMutableDictionary alloc] initWithCapacity:0];
+            }
         } else {
             _weightCache = [[NSMutableDictionary alloc] initWithCapacity:0];
         }
@@ -83,7 +86,12 @@ static CacheManager* sharedInstance = nil;
 }
 
 - (void)persist {
-    [_weightCache writeToFile:[[self getSharedFolder] stringByAppendingPathComponent:@"weight.plist"] atomically:YES];
+    if (!_weightCache) {
+        return;
+    }
+    NSString *folder = [self getSharedFolder];
+    [[NSFileManager defaultManager] createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:NULL];
+    [_weightCache writeToFile:[folder stringByAppendingPathComponent:@"weight.plist"] atomically:YES];
 }
 
 - (NSString*)getSharedFolder {
@@ -95,23 +103,38 @@ static CacheManager* sharedInstance = nil;
 
 // Weight Cache
 - (NSString*)stringForKey:(NSString*)aKey {
+    if (!aKey) {
+        return nil;
+    }
     return [_weightCache objectForKey:aKey];
 }
 
 - (void)removeStringForKey:(NSString*)aKey {
+    if (!aKey) {
+        return;
+    }
     [_weightCache removeObjectForKey:aKey];
 }
 
 - (void)setString:(NSString*)aString forKey:(NSString*)aKey {
+    if (!aString || !aKey) {
+        return;
+    }
     [_weightCache setObject:aString forKey:aKey];
 }
 
 // Phonetic Cache
 - (NSArray*)arrayForKey:(NSString*)aKey {
+    if (!aKey) {
+        return nil;
+    }
     return [_phoneticCache objectForKey:aKey];
 }
 
 - (void)setArray:(NSArray*)anArray forKey:(NSString*)aKey {
+    if (!anArray || !aKey) {
+        return;
+    }
     [_phoneticCache setObject:anArray forKey:aKey];
 }
 
@@ -121,10 +144,16 @@ static CacheManager* sharedInstance = nil;
 }
 
 - (NSArray*)baseForKey:(NSString*)aKey {
+    if (!aKey) {
+        return nil;
+    }
     return [_recentBaseCache objectForKey:aKey];
 }
 
 - (void)setBase:(NSArray*)aBase forKey:(NSString*)aKey {
+    if (!aBase || !aKey) {
+        return;
+    }
     [_recentBaseCache setObject:aBase forKey:aKey];
 }
 
