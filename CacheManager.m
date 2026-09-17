@@ -123,6 +123,17 @@ static CacheManager* sharedInstance = nil;
     [_weightCache setObject:aString forKey:aKey];
 }
 
+static const NSUInteger kPhoneticCacheLimit = 1000;
+static const NSUInteger kRecentBaseCacheLimit = 500;
+
++ (void)evictHalfOfDictionary:(NSMutableDictionary *)dict {
+    NSArray *keys = [dict allKeys];
+    NSUInteger n = [keys count] / 2;
+    for (NSUInteger i = 0; i < n; i++) {
+        [dict removeObjectForKey:[keys objectAtIndex:i]];
+    }
+}
+
 // Phonetic Cache
 - (NSArray*)arrayForKey:(NSString*)aKey {
     if (!aKey) {
@@ -131,11 +142,18 @@ static CacheManager* sharedInstance = nil;
     return [_phoneticCache objectForKey:aKey];
 }
 
+- (NSUInteger)phoneticCacheCount {
+    return [_phoneticCache count];
+}
+
 - (void)setArray:(NSArray*)anArray forKey:(NSString*)aKey {
     if (!anArray || !aKey) {
         return;
     }
     [_phoneticCache setObject:anArray forKey:aKey];
+    if ([_phoneticCache count] > kPhoneticCacheLimit) {
+        [[self class] evictHalfOfDictionary:_phoneticCache];
+    }
 }
 
 // Base Cache
@@ -150,11 +168,18 @@ static CacheManager* sharedInstance = nil;
     return [_recentBaseCache objectForKey:aKey];
 }
 
+- (NSUInteger)recentBaseCacheCount {
+    return [_recentBaseCache count];
+}
+
 - (void)setBase:(NSArray*)aBase forKey:(NSString*)aKey {
     if (!aBase || !aKey) {
         return;
     }
     [_recentBaseCache setObject:aBase forKey:aKey];
+    if ([_recentBaseCache count] > kRecentBaseCacheLimit) {
+        [[self class] evictHalfOfDictionary:_recentBaseCache];
+    }
 }
 
 @end

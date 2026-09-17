@@ -27,10 +27,12 @@
 // Phonetic Cahce (default for Array)
 - (NSArray*)arrayForKey:(NSString*)aKey;
 - (void)setArray:(NSArray*)anArray forKey:(NSString*)aKey;
+- (NSUInteger)phoneticCacheCount;
 
 // Base Cahce
 - (void)removeAllBase;
 - (NSArray*)baseForKey:(NSString*)aKey;
 - (void)setBase:(NSArray*)aBase forKey:(NSString*)aKey;
+- (NSUInteger)recentBaseCacheCount;
 
 @end

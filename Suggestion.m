@@ -135,7 +135,9 @@ static Suggestion *sharedInstance = nil;
             boolForKey:kEnableSuggestionsDefaultsKey]) {
       NSInteger i;
       BOOL alreadySelected = FALSE;
-      [[CacheManager sharedInstance] removeAllBase];
+      // NOTE: no removeAllBase here. The base cache is bounded inside
+      // CacheManager; nuking it every keystroke dropped reverse-suffix
+      // entries written by the previous term before the user could select.
       for (i = [term length] - 1; i > 0; --i) {
         NSString *suffix = [[Database sharedInstance]
             banglaForSuffix:[[term substringFromIndex:i] lowercaseString]];
