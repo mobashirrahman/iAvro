@@ -6,6 +6,10 @@
 	<integer>1</integer>
 	<key>CommitNewLineOnEnter</key>
 	<false/>
+	<key>PipeToDot</key>
+	<false/>
+	<key>EnableJoNukta</key>
+	<false/>
 	<key>TabBrowsing</key>
 	<false/>
 	<key>ClassicPhonetic</key>

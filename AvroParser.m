@@ -6,6 +6,7 @@
 //
 
 #import "AvroParser.h"
+#import "SettingsKeys.h"
 
 static AvroParser* sharedInstance = nil;
 
@@ -104,6 +105,8 @@ static AvroParser* sharedInstance = nil;
 
     NSString * fixed = [self fix:string];
     NSMutableString* output = [[NSMutableString alloc] initWithCapacity:0];
+    // Windows Avro option: Shift-J types জ় (jo + nukta) instead of জ
+    BOOL joNukta = [[NSUserDefaults standardUserDefaults] boolForKey:kJoNuktaDefaultsKey];
 
     NSInteger len = [fixed length], cur;
     for(cur = 0; cur < len; ++cur) {
@@ -119,6 +122,12 @@ static AvroParser* sharedInstance = nil;
                 // Order-independent hash lookup. The table is not in valid
                 // binary-search order (e.g. TT before TH), so binary search
                 // silently missed patterns like TH, H and qq.
+                if (joNukta && [chunk isEqualToString:@"J"]) {
+                    [output appendString:@"\u099C\u09BC"];
+                    cur = end - 1;
+                    matched = TRUE;
+                    break;
+                }
                 NSDictionary* pattern = [_patternDict objectForKey:chunk];
                 if (pattern) {
                         NSArray* rules = [pattern objectForKey:@"rules"];

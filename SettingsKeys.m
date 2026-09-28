@@ -6,4 +6,6 @@ NSString *const kOfferEnglishDefaultsKey = @"OfferEnglishSuggestion";
 NSString *const kPreferTransliterationDefaultsKey = @"PreferTransliteration";
 NSString *const kClassicPhoneticDefaultsKey = @"ClassicPhonetic";
 NSString *const kTabBrowsingDefaultsKey = @"TabBrowsing";
+NSString *const kPipeToDotDefaultsKey = @"PipeToDot";
+NSString *const kJoNuktaDefaultsKey = @"EnableJoNukta";
 NSString *const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";

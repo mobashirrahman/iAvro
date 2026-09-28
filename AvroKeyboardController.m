@@ -23,6 +23,7 @@
 - (BOOL)isClassicMode;
 - (NSString *)classicOutput;
 - (BOOL)browseCandidatesBy:(NSInteger)step;
+- (NSString *)englishCandidate;
 @end
 
 @implementation AvroKeyboardController
@@ -134,6 +135,13 @@
     }
 }
 
+// The buffer as English text: Avro's literal-dot syntax (".`", also what
+// Shift-\\ types) reads as a plain dot.
+- (NSString *)englishCandidate {
+    // Copy: with nothing to replace this can return the mutable buffer itself
+    return [[[_composedBuffer stringByReplacingOccurrencesOfString:@".`" withString:@"."] copy] autorelease];
+}
+
 // Windows Avro offers the typed Roman text as the last choice, so English
 // words can be typed without switching input sources. Choosing it is
 // remembered like any other candidate: the weight cache stores the raw term.
@@ -141,10 +149,11 @@
     if (![[NSUserDefaults standardUserDefaults] boolForKey:kOfferEnglishDefaultsKey]) {
         return;
     }
-    if ([_currentCandidates containsObject:_composedBuffer]) {
+    NSString *english = [self englishCandidate];
+    if ([_currentCandidates containsObject:english]) {
         return;
     }
-    [_currentCandidates addObject:[[_composedBuffer copy] autorelease]];
+    [_currentCandidates addObject:english];
     if (_prevSelected == -1 && prevString && [prevString isEqualToString:[self term]]) {
         _prevSelected = (int)[_currentCandidates count] - 1;
     }
@@ -257,7 +266,7 @@
             if ((comp && _prevSelected == -1) == NO) {
                 NSUInteger prefixLen = [[self prefix] length];
                 NSUInteger suffixLen = [[self suffix] length];
-                if ([candidateText isEqualToString:_composedBuffer]) {
+                if ([candidateText isEqualToString:[self englishCandidate]]) {
                     // English candidate: its prefix/suffix are Roman, not the
                     // parsed lengths above, so remember the raw term itself.
                     [[CacheManager sharedInstance] setString:[self term] forKey:[self term]];
@@ -388,6 +397,11 @@
         return NO;
     }
     else {
+        if ([string isEqualToString:@"|"] &&
+            [[NSUserDefaults standardUserDefaults] boolForKey:kPipeToDotDefaultsKey]) {
+            // Windows Avro option: Avro's literal-dot syntax, since "." alone is দাঁড়ি
+            string = @".`";
+        }
         [_composedBuffer appendString:string];
         [self findCurrentCandidates];
         [self updateComposition];

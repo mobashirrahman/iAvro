@@ -135,17 +135,26 @@
 static const NSInteger kFirstGeneralToggleTag = 1001;
 static const CGFloat kToggleRowHeight = 22.0;
 
-// Checkboxes added in code, in display order: { title, defaults key }.
+// Checkboxes added in code, in display order: { title, defaults key,
+// optional tooltip }.
 // New phonetic options go here rather than in the nib.
 - (NSArray *)generalToggles {
   return [NSArray arrayWithObjects:
       [NSArray arrayWithObjects:@"Enable Suggestions", kEnableSuggestionsDefaultsKey, nil],
       [NSArray arrayWithObjects:@"Enable AutoCorrect", kEnableAutoCorrectDefaultsKey, nil],
       [NSArray arrayWithObjects:@"Show Bengali inline while typing", kShowInlineBanglaDefaultsKey, nil],
-      [NSArray arrayWithObjects:@"Offer typed English as the last suggestion", kOfferEnglishDefaultsKey, nil],
-      [NSArray arrayWithObjects:@"Preselect exact transliteration, not dictionary word", kPreferTransliterationDefaultsKey, nil],
-      [NSArray arrayWithObjects:@"Classic phonetic: no suggestion window", kClassicPhoneticDefaultsKey, nil],
-      [NSArray arrayWithObjects:@"Use Tab / Shift-Tab to move through suggestions", kTabBrowsingDefaultsKey, nil],
+      [NSArray arrayWithObjects:@"Suggest the typed English too", kOfferEnglishDefaultsKey,
+          @"Add what you typed, unconverted, as the last suggestion so English words can be typed without switching input sources.", nil],
+      [NSArray arrayWithObjects:@"Preselect exact transliteration", kPreferTransliterationDefaultsKey,
+          @"Without a remembered choice or AutoCorrect match, preselect the plain transliteration instead of the top dictionary word.", nil],
+      [NSArray arrayWithObjects:@"Classic mode (no suggestions)", kClassicPhoneticDefaultsKey,
+          @"Type without the suggestion window: AutoCorrect if it matches, otherwise the plain transliteration.", nil],
+      [NSArray arrayWithObjects:@"Browse suggestions with Tab", kTabBrowsingDefaultsKey,
+          @"Tab selects the next suggestion and Shift-Tab the previous one, instead of committing.", nil],
+      [NSArray arrayWithObjects:@"Shift-\\ ( | ) types a dot", kPipeToDotDefaultsKey,
+          @"Type a plain dot (.) with the | key; a lone . still types দাঁড়ি (।).", nil],
+      [NSArray arrayWithObjects:@"Shift-J types জ় (jo + nukta)", kJoNuktaDefaultsKey,
+          @"Shift-J types জ় instead of জ.", nil],
       nil];
 }
 
@@ -188,6 +197,9 @@ static const CGFloat kToggleRowHeight = 22.0;
     [toggle setTag:kFirstGeneralToggleTag + i];
     [toggle setButtonType:NSSwitchButton];
     [toggle setTitle:[spec objectAtIndex:0]];
+    if ([spec count] > 2) {
+      [toggle setToolTip:[spec objectAtIndex:2]];
+    }
     [toggle setBezelStyle:NSBezelStyleRegularSquare];
     [toggle setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
     [toggle bind:@"value"
