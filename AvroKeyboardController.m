@@ -19,6 +19,7 @@
 - (NSString *)compositionDisplayString;
 - (NSString *)stringFromCandidate:(id)candidate;
 - (void)addEnglishCandidateRemembering:(NSString *)prevString;
+- (NSInteger)preferredTransliterationIndex;
 @end
 
 @implementation AvroKeyboardController
@@ -108,6 +109,9 @@
                     }
                 }
                 [self addEnglishCandidateRemembering:prevString];
+                if (_prevSelected == -1) {
+                    _prevSelected = (int)[self preferredTransliterationIndex];
+                }
                 if (_prevSelected >= 0 && _prevSelected < [_currentCandidates count]) {
                     _selectedCandidateIndex = _prevSelected;
                 } else {
@@ -136,6 +140,25 @@
     if (_prevSelected == -1 && prevString && [prevString isEqualToString:[self term]]) {
         _prevSelected = (int)[_currentCandidates count] - 1;
     }
+}
+
+// Windows Avro's "character mode": with no remembered choice and no
+// AutoCorrect hit, preselect the exact transliteration instead of the
+// top dictionary word. Returns -1 to keep the default (first) candidate.
+- (NSInteger)preferredTransliterationIndex {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    if (![defaults boolForKey:kPreferTransliterationDefaultsKey] ||
+        ![defaults boolForKey:@"IncludeDictionary"] || [[self term] length] < 2) {
+        return -1;
+    }
+    if ([defaults boolForKey:kEnableAutoCorrectDefaultsKey] &&
+        [[AutoCorrect sharedInstance] find:[self term]]) {
+        return -1;
+    }
+    NSString *exact = [NSString stringWithFormat:@"%@%@%@", [self prefix],
+                       [[AvroParser sharedInstance] parse:[self term]], [self suffix]];
+    NSUInteger index = [_currentCandidates indexOfObject:exact];
+    return index == NSNotFound ? -1 : (NSInteger)index;
 }
 
 - (void)updateCandidatesPanel {
