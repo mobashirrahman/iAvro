@@ -9,6 +9,7 @@
 
 @interface Suggestion : NSObject {
     NSMutableArray* _suggestions;
+    NSInteger _cachedPreferenceFlags;
 }
 
 + (Suggestion *)sharedInstance;

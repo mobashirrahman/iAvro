@@ -142,6 +142,10 @@ static const NSUInteger kRecentBaseCacheLimit = 500;
     return [_phoneticCache objectForKey:aKey];
 }
 
+- (void)removeAllArrays {
+    [_phoneticCache removeAllObjects];
+}
+
 - (NSUInteger)phoneticCacheCount {
     return [_phoneticCache count];
 }

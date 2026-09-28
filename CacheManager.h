@@ -28,6 +28,7 @@
 - (NSArray*)arrayForKey:(NSString*)aKey;
 - (void)setArray:(NSArray*)anArray forKey:(NSString*)aKey;
 - (NSUInteger)phoneticCacheCount;
+- (void)removeAllArrays;
 
 // Base Cahce
 - (void)removeAllBase;

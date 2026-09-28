@@ -59,6 +59,7 @@ static Suggestion *sharedInstance = nil;
   self = [super init];
   if (self) {
     _suggestions = [[NSMutableArray alloc] initWithCapacity:0];
+    _cachedPreferenceFlags = -1;
   }
   return self;
 }
@@ -66,6 +67,76 @@ static Suggestion *sharedInstance = nil;
 - (void)dealloc {
   [_suggestions release];
   [super dealloc];
+}
+
+// AutoCorrect + ranked dictionary words for a term, memoized in the phonetic
+// cache. A cached empty array counts as a hit, so unknown words aren't
+// re-scanned on every keystroke.
+- (NSArray *)wordsForTerm:(NSString *)term {
+  NSArray *cached = [[CacheManager sharedInstance] arrayForKey:term];
+  if (cached) {
+    return cached;
+  }
+
+  NSMutableArray *words = [NSMutableArray arrayWithCapacity:0];
+  NSString *autoCorrect = nil;
+  // Suggestions form AutoCorrect
+  if ([[NSUserDefaults standardUserDefaults]
+          boolForKey:kEnableAutoCorrectDefaultsKey]) {
+    autoCorrect = [[AutoCorrect sharedInstance] find:term];
+    if (autoCorrect) {
+      [words addObject:autoCorrect];
+    }
+  }
+
+  // Suggestions from Dictionary
+  if ([[NSUserDefaults standardUserDefaults]
+          boolForKey:kEnableSuggestionsDefaultsKey]) {
+    NSArray *dicList = [[Database sharedInstance] find:term];
+    if (dicList) {
+      // Remove autoCorrect if it is already in the dictionary
+      if (autoCorrect && [dicList containsObject:autoCorrect]) {
+        [words removeObject:autoCorrect];
+      }
+      // Compute each edit distance once, then sort by cached value
+      NSString *parsed = [[AvroParser sharedInstance] parse:term];
+      NSMutableDictionary *distances =
+          [NSMutableDictionary dictionaryWithCapacity:[dicList count]];
+      for (NSString *word in dicList) {
+        int dist = [parsed computeLevenshteinDistanceWithString:word];
+        [distances setObject:[NSNumber numberWithInt:dist] forKey:word];
+      }
+      NSArray *sortedDicList = [dicList
+          sortedArrayUsingComparator:^NSComparisonResult(id left, id right) {
+            int dist1 = [[distances objectForKey:left] intValue];
+            int dist2 = [[distances objectForKey:right] intValue];
+            if (dist1 < dist2) {
+              return NSOrderedAscending;
+            } else if (dist1 > dist2) {
+              return NSOrderedDescending;
+            } else {
+              return [(NSString *)left compare:(NSString *)right];
+            }
+          }];
+      [words addObjectsFromArray:sortedDicList];
+    }
+  }
+
+  NSArray *result = [[words copy] autorelease];
+  [[CacheManager sharedInstance] setArray:result forKey:term];
+  return result;
+}
+
+// Cached word lists depend on the AutoCorrect/Suggestions toggles, so drop
+// them whenever either toggle changes.
+- (void)invalidateCacheIfPreferencesChanged {
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  NSInteger flags = ([defaults boolForKey:kEnableAutoCorrectDefaultsKey] ? 1 : 0) |
+                    ([defaults boolForKey:kEnableSuggestionsDefaultsKey] ? 2 : 0);
+  if (flags != _cachedPreferenceFlags) {
+    [[CacheManager sharedInstance] removeAllArrays];
+    _cachedPreferenceFlags = flags;
+  }
 }
 
 - (NSArray *)getList:(NSString *)term {
@@ -77,58 +148,8 @@ static Suggestion *sharedInstance = nil;
   // Suggestions from Default Parser
   NSString *paresedString = [[AvroParser sharedInstance] parse:term];
   if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
-    // Saving humanity by reducing a few CPU cycles
-    [_suggestions
-        addObjectsFromArray:[[CacheManager sharedInstance] arrayForKey:term]];
-    if (_suggestions && [_suggestions count] == 0) {
-      // Suggestions form AutoCorrect
-      if ([[NSUserDefaults standardUserDefaults]
-              boolForKey:kEnableAutoCorrectDefaultsKey]) {
-        NSString *autoCorrect = [[AutoCorrect sharedInstance] find:term];
-        if (autoCorrect) {
-          [_suggestions addObject:autoCorrect];
-        }
-      }
-
-      // Suggestions from Dictionary
-      if ([[NSUserDefaults standardUserDefaults]
-              boolForKey:kEnableSuggestionsDefaultsKey]) {
-        NSArray *dicList = [[Database sharedInstance] find:term];
-        if (dicList) {
-          // Remove autoCorrect if it is already in the dictionary
-          // PROPOSAL: don't add the autoCorrect, which matches with the
-          // dictionary entry
-          NSString *autoCorrect = [[AutoCorrect sharedInstance] find:term];
-          if (autoCorrect && [dicList containsObject:autoCorrect]) {
-            [_suggestions removeObject:autoCorrect];
-          }
-          // Compute each edit distance once, then sort by cached value
-          NSMutableDictionary *distances =
-              [NSMutableDictionary dictionaryWithCapacity:[dicList count]];
-          for (NSString *word in dicList) {
-            int dist = [paresedString computeLevenshteinDistanceWithString:word];
-            [distances setObject:[NSNumber numberWithInt:dist] forKey:word];
-          }
-          NSArray *sortedDicList = [dicList
-              sortedArrayUsingComparator:^NSComparisonResult(id left,
-                                                             id right) {
-                int dist1 = [[distances objectForKey:left] intValue];
-                int dist2 = [[distances objectForKey:right] intValue];
-                if (dist1 < dist2) {
-                  return NSOrderedAscending;
-                } else if (dist1 > dist2) {
-                  return NSOrderedDescending;
-                } else {
-                  return [(NSString *)left compare:(NSString *)right];
-                }
-              }];
-          [_suggestions addObjectsFromArray:sortedDicList];
-        }
-      }
-
-      [[CacheManager sharedInstance] setArray:[[_suggestions copy] autorelease]
-                                       forKey:term];
-    }
+    [self invalidateCacheIfPreferencesChanged];
+    [_suggestions addObjectsFromArray:[self wordsForTerm:term]];
 
     // Suggestions with Suffix
     if ([[NSUserDefaults standardUserDefaults]
@@ -143,13 +164,15 @@ static Suggestion *sharedInstance = nil;
             banglaForSuffix:[[term substringFromIndex:i] lowercaseString]];
         if (suffix && [suffix length] > 0) {
           NSString *base = [term substringToIndex:i];
-          NSArray *cached = [[CacheManager sharedInstance] arrayForKey:base];
-          NSString *selected;
+          // Usually a cache hit (the base was typed on the way here), but the
+          // cache evicts, so compute it on a miss rather than dropping
+          // suffix suggestions.
+          NSArray *cached = [self wordsForTerm:base];
+          NSString *selected = nil;
           if (!alreadySelected) {
             // Base user selection
             selected = [[CacheManager sharedInstance] stringForKey:base];
           }
-          // This should always exist, so it's just a safety check
           if (cached) {
             for (NSString *item in cached) {
               if (!item || [item length] == 0) {
