@@ -89,8 +89,20 @@
                     [[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
                     NSString* smily = [[AutoCorrect sharedInstance] find:_composedBuffer];
                     if (smily) {
+                        // The term's own AutoCorrect entry can already yield it
+                        // (":" + ")"), so move it to the front instead of adding twice.
+                        NSUInteger existing = [_currentCandidates indexOfObject:smily];
+                        BOOL wasSelected = (existing != NSNotFound && _prevSelected == (int)existing);
+                        if (existing != NSNotFound) {
+                            [_currentCandidates removeObjectAtIndex:existing];
+                            if (_prevSelected > (int)existing) {
+                                _prevSelected -= 1;
+                            }
+                        }
                         [_currentCandidates insertObject:smily atIndex:0];
-                        if (_prevSelected >= 0) {
+                        if (wasSelected) {
+                            _prevSelected = 0;
+                        } else if (_prevSelected >= 0) {
                             _prevSelected += 1;
                         }
                     }
