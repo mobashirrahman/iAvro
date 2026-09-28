@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - master
+      - fix/bug-series
 
 jobs:
   build:
@@ -25,7 +26,10 @@ jobs:
       - name: Install Pods
         run: pod install
 
-      - name: Build
+      - name: Run regression tests
+        run: Tests/run_tests.sh
+
+      - name: Build (universal)
         run: |
           set -euo pipefail
           xcodebuild \
@@ -34,19 +38,58 @@ jobs:
             -configuration Release \
             -sdk macosx \
             -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            ARCHS="x86_64 arm64" \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=""
+
+      - name: Verify universal binary
+        run: |
+          set -euo pipefail
+          BIN="build/Build/Products/Release/Avro Keyboard.app/Contents/MacOS/Avro Keyboard"
+          if [ ! -f "$BIN" ]; then
+            echo "Binary not found at $BIN"
+            find build -maxdepth 5 -name "*.app"
+            exit 1
+          fi
+          echo "--- architectures ---"
+          lipo -info "$BIN"
+          lipo -info "$BIN" | grep -q "x86_64" || { echo "FAIL: missing x86_64 slice"; exit 1; }
+          lipo -info "$BIN" | grep -q "arm64"  || { echo "FAIL: missing arm64 slice"; exit 1; }
+          echo "OK: universal x86_64 + arm64"
+
+      - name: Verify hardened runtime
+        run: |
+          set -euo pipefail
+          BIN="build/Build/Products/Release/Avro Keyboard.app/Contents/MacOS/Avro Keyboard"
+          FLAGS=$(codesign -d --verbose=2 "$BIN" 2>&1 || true)
+          echo "$FLAGS"
+          if echo "$FLAGS" | grep -q "flags=.*runtime"; then
+            echo "OK: hardened runtime enabled"
+          else
+            echo "FAIL: hardened runtime missing (notarization will be rejected)"
+            exit 1
+          fi
+
+      - name: Verify Info.plist
+        run: |
+          set -euo pipefail
+          APP="build/Build/Products/Release/Avro Keyboard.app"
+          plutil -lint "$APP/Contents/Info.plist"
+          NAME=$(/usr/libexec/PlistBuddy -c "Print :CFBundleName" "$APP/Contents/Info.plist")
+          echo "CFBundleName=$NAME"
+          [ "$NAME" = "Avro Keyboard" ] || { echo "FAIL: unexpected CFBundleName"; exit 1; }
+          /usr/libexec/PlistBuddy -c "Print :InputMethodServerControllerClass" \
+            "$APP/Contents/Info.plist" >/dev/null
+          echo "OK: Info.plist sane"
 
       - name: Package App
         run: |
           set -euo pipefail
           APP_PATH="build/Build/Products/Release/Avro Keyboard.app"
-          if [ ! -d "$APP_PATH" ]; then
-            echo "App not found at $APP_PATH"
-            find build -maxdepth 5 -name "*.app"
-            exit 1
-          fi
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "AvroKeyboard-macOS.zip"
 
       - name: Upload Artifact
