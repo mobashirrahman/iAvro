@@ -233,11 +233,47 @@ static Suggestion *sharedInstance = nil;
     }
   }
 
+  // All-caps input also offers the letters spelled out (ABC -> এবিসি)
+  NSString *abbreviation = [self abbreviationForTerm:term];
+  if (abbreviation && ![_suggestions containsObject:abbreviation]) {
+    [_suggestions addObject:abbreviation];
+  }
+
   if ([_suggestions containsObject:paresedString] == NO) {
     [_suggestions addObject:paresedString];
   }
 
   return [[_suggestions copy] autorelease];
+}
+
+// Ported from Windows Avro (clsAbbreviation): English letter names in
+// Bangla. Only for terms with no lowercase letters and at least one letter.
+- (NSString *)abbreviationForTerm:(NSString *)term {
+  static NSDictionary *names = nil;
+  if (!names) {
+    names = [[NSDictionary alloc] initWithObjectsAndKeys:
+        @"এ", @"A", @"বি", @"B", @"সি", @"C", @"ডি", @"D", @"ই", @"E",
+        @"এফ", @"F", @"জি", @"G", @"এইচ", @"H", @"আই", @"I", @"জে", @"J",
+        @"কে", @"K", @"এল", @"L", @"এম", @"M", @"এন", @"N", @"ও", @"O",
+        @"পি", @"P", @"কিউ", @"Q", @"আর", @"R", @"এস", @"S", @"টি", @"T",
+        @"ইউ", @"U", @"ভি", @"V", @"ডব্লিউ", @"W", @"এক্স", @"X",
+        @"ওয়াই", @"Y", @"জেড", @"Z",
+        @"০", @"0", @"১", @"1", @"২", @"2", @"৩", @"3", @"৪", @"4",
+        @"৫", @"5", @"৬", @"6", @"৭", @"7", @"৮", @"8", @"৯", @"9", nil];
+  }
+  if (![term isEqualToString:[term uppercaseString]] ||
+      [term rangeOfCharacterFromSet:[NSCharacterSet uppercaseLetterCharacterSet]]
+              .location == NSNotFound) {
+    return nil;
+  }
+  NSMutableString *result = [NSMutableString stringWithCapacity:[term length] * 2];
+  NSUInteger i;
+  for (i = 0; i < [term length]; i++) {
+    NSString *c = [term substringWithRange:NSMakeRange(i, 1)];
+    NSString *name = [names objectForKey:c];
+    [result appendString:name ? name : c];
+  }
+  return result;
 }
 
 - (BOOL)isKar:(NSString *)letter {

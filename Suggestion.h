@@ -15,6 +15,7 @@
 + (Suggestion *)sharedInstance;
 
 - (NSArray*)getList:(NSString*)term;
+- (NSString*)abbreviationForTerm:(NSString*)term;
 - (BOOL)isKar:(NSString*)letter;
 - (BOOL)isVowel:(NSString*)letter;
 
