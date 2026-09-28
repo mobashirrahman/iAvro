@@ -43,11 +43,11 @@ keystroke -> _composedBuffer (AvroKeyboardController.m:236)
 - Related: `_prevSelected` truthiness bug `:74` treats index 0 as false.
 - Fix: init to 0, reset on new composition, bounds-check every commit path.
 
-### B4. RegexParser drops case-sensitive chars
-- `RegexParser.m:290-301` `clean:` has no `else` branch, deletes case-sensitive letters.
-- Correct impl: `AvroParser.m:299-313` `fix:`.
-- `regex.json:858` `casesensitive` is punctuation set; `data.json:2160` `casesensitive` is `oiudDgjnrstyzh` - check both tables when fixing.
-- Fix: preserve case-sensitive chars, add golden tests.
+### B4. ~~RegexParser drops case-sensitive chars~~ - NOT A BUG, do not "fix"
+- `regex.json` `casesensitive` is the set of regex metacharacters (`|()[]{}^$*+?.` ...), not letters.
+- `-[RegexParser clean:]` drops them on purpose so they are never injected into the dictionary regex.
+- Adding an `else` branch (76d6418) made `ki(re` compile to an invalid pattern and `a.b` a wildcard; reverted in 7453ac1.
+- Test to keep: `find:@"ki(re"` returns the same words as `find:@"kire"`.
 
 ### B5. isExact off-by-one
 - `AvroParser.m:285-290`, `RegexParser.m:277-281`: `end < length` should be `end <= length`.
@@ -92,13 +92,13 @@ Missing in iAvro:
 ## 5. Step-by-step plan
 
 ### Phase 0 - Harness (1-2d)
-- [ ] Add XCTest target. Tests: parser goldens (`khondo`, `TH`, `chOTO`), `isExact` end match, `clean:` preserves case-sensitive, `getList:` isolation, empty term, OOB index.
+- [ ] Add XCTest target. Tests: parser goldens (`khondo`, `TH`, `chOTO`), `isExact` end match, `clean:` strips regex metacharacters (B4), `getList:` isolation, empty term, OOB index.
 - [ ] Measure: cold start ms, per-keystroke ms with Instruments.
 
 ### Phase 1 - Crash fixes (1wk) - do first
 - [ ] B1: clear-and-copy semantics for `getList:`.
 - [ ] B2/B3: unify candidate type, init + bounds-check index, fix `_prevSelected==-1` check.
-- [ ] B4/B5/B6: fix `clean:`, `isExact`, guards.
+- [ ] B5/B6: fix `isExact`, guards. (B4 is not a bug - see above.)
 - [ ] B7: persist on commit, nil-dict fallback.
 - Acceptance: fuzz typing no crash, no stale candidates, learning survives restart.
 
