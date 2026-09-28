@@ -297,11 +297,12 @@ static RegexParser* sharedInstance = nil;
     NSInteger i, len = [string length];
     for (i = 0; i < len; ++i) {
         unichar c = [string characterAtIndex:i];
+        // regex.json's "casesensitive" set is the regex metacharacters
+        // (|()[]{}^$*+?. etc.), not case-sensitive letters. They are dropped
+        // on purpose so they can't be injected into the dictionary regex
+        // (e.g. "ki(re" would otherwise compile to an invalid pattern).
         if (![self isCaseSensitive:c]) {
             [fixed appendFormat:@"%C", [self smallCap:c]];
-        }
-        else {
-            [fixed appendFormat:@"%C", c];
         }
     }
     [fixed autorelease];
