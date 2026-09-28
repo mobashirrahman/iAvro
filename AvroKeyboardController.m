@@ -20,6 +20,8 @@
 - (NSString *)stringFromCandidate:(id)candidate;
 - (void)addEnglishCandidateRemembering:(NSString *)prevString;
 - (NSInteger)preferredTransliterationIndex;
+- (BOOL)isClassicMode;
+- (NSString *)classicOutput;
 @end
 
 @implementation AvroKeyboardController
@@ -65,7 +67,12 @@
             [self setPrefix:[[AvroParser sharedInstance] parse:[items objectAtIndex:1]]];
             [self setTerm:[items objectAtIndex:2]];
             [self setSuffix:[[AvroParser sharedInstance] parse:[items objectAtIndex:3]]];
-            
+
+            if ([self isClassicMode]) {
+                [_currentCandidates addObject:[self classicOutput]];
+                return;
+            }
+
             NSArray *freshList = [[Suggestion sharedInstance] getList:[self term]];
             [_currentCandidates release];
             _currentCandidates = [freshList mutableCopy];
@@ -161,7 +168,35 @@
     return index == NSNotFound ? -1 : (NSInteger)index;
 }
 
+- (BOOL)isClassicMode {
+    return [[NSUserDefaults standardUserDefaults] boolForKey:kClassicPhoneticDefaultsKey];
+}
+
+// Windows Avro's classic phonetic: no window, no dictionary. The output is
+// the AutoCorrect entry when there is one, else the plain transliteration.
+- (NSString *)classicOutput {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:kEnableAutoCorrectDefaultsKey]) {
+        // Whole-buffer entries first, like the emoticon lookup (":-)")
+        if (![_composedBuffer isEqualToString:[self term]]) {
+            NSString *whole = [[AutoCorrect sharedInstance] find:_composedBuffer];
+            if (whole) {
+                return whole;
+            }
+        }
+        NSString *corrected = [[AutoCorrect sharedInstance] find:[self term]];
+        if (corrected) {
+            return [NSString stringWithFormat:@"%@%@%@", [self prefix], corrected, [self suffix]];
+        }
+    }
+    return [NSString stringWithFormat:@"%@%@%@", [self prefix],
+            [[AvroParser sharedInstance] parse:[self term]], [self suffix]];
+}
+
 - (void)updateCandidatesPanel {
+    if ([self isClassicMode]) {
+        [[Candidates sharedInstance] hide];
+        return;
+    }
     if (_currentCandidates && [_currentCandidates count] > 0) {
         NSUserDefaults *defaultsDictionary = [NSUserDefaults standardUserDefaults];
         
@@ -290,6 +325,10 @@
 }
 
 - (NSString *)compositionDisplayString {
+    // Classic mode has no window, so the Bangla must show inline
+    if ([self isClassicMode] && [_currentCandidates count] > 0) {
+        return [_currentCandidates objectAtIndex:0];
+    }
     if (![[NSUserDefaults standardUserDefaults] boolForKey:kShowInlineBanglaDefaultsKey]) {
         return _composedBuffer ? _composedBuffer : @"";
     }
