@@ -145,6 +145,7 @@ static const CGFloat kToggleRowHeight = 22.0;
       [NSArray arrayWithObjects:@"Offer typed English as the last suggestion", kOfferEnglishDefaultsKey, nil],
       [NSArray arrayWithObjects:@"Preselect exact transliteration, not dictionary word", kPreferTransliterationDefaultsKey, nil],
       [NSArray arrayWithObjects:@"Classic phonetic: no suggestion window", kClassicPhoneticDefaultsKey, nil],
+      [NSArray arrayWithObjects:@"Use Tab / Shift-Tab to move through suggestions", kTabBrowsingDefaultsKey, nil],
       nil];
 }
 

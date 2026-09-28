@@ -22,6 +22,7 @@
 - (NSInteger)preferredTransliterationIndex;
 - (BOOL)isClassicMode;
 - (NSString *)classicOutput;
+- (BOOL)browseCandidatesBy:(NSInteger)step;
 @end
 
 @implementation AvroKeyboardController
@@ -407,7 +408,36 @@
 }
 
 - (void)insertTab:(id)sender {
-    [self commitText:@"\t"];
+    if (![self browseCandidatesBy:1]) {
+        [self commitText:@"\t"];
+    }
+}
+
+- (void)insertBacktab:(id)sender {
+    [self browseCandidatesBy:-1];
+}
+
+// Windows Avro's Tab browsing: step through the candidates instead of
+// committing. Returns NO when off or there is nothing to browse.
+- (BOOL)browseCandidatesBy:(NSInteger)step {
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:kTabBrowsingDefaultsKey] ||
+        [_currentCandidates count] < 2) {
+        return NO;
+    }
+    NSInteger target = _selectedCandidateIndex + step;
+    if (target < 0 || target >= (NSInteger)[_currentCandidates count]) {
+        return YES; // at the end: stay put, like the arrow keys
+    }
+    BOOL vertical = [[Candidates sharedInstance] panelType] == kIMKSingleColumnScrollingCandidatePanel;
+    if (step > 0) {
+        vertical ? [[Candidates sharedInstance] moveDown:self] : [[Candidates sharedInstance] moveRight:self];
+    } else {
+        vertical ? [[Candidates sharedInstance] moveUp:self] : [[Candidates sharedInstance] moveLeft:self];
+    }
+    // Also record it directly (index + learning) rather than relying only
+    // on the panel's callback.
+    [self candidateSelectionChanged:[_currentCandidates objectAtIndex:target]];
+    return YES;
 }
 
 - (void)insertNewline:(id)sender {
@@ -457,7 +487,9 @@
 		// we might not handle the command.
 		
 		if (_composedBuffer && [_composedBuffer length] > 0) {
-            if (aSelector == @selector(insertTab:) 
+            if (aSelector == @selector(insertTab:)
+                || (aSelector == @selector(insertBacktab:) &&
+                    [[NSUserDefaults standardUserDefaults] boolForKey:kTabBrowsingDefaultsKey])
                 || aSelector == @selector(insertNewline:)
                 || aSelector == @selector(deleteBackward:)
                 || aSelector == @selector(moveLeft:)

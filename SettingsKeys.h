@@ -5,4 +5,5 @@ extern NSString *const kEnableSuggestionsDefaultsKey;
 extern NSString *const kOfferEnglishDefaultsKey;
 extern NSString *const kPreferTransliterationDefaultsKey;
 extern NSString *const kClassicPhoneticDefaultsKey;
+extern NSString *const kTabBrowsingDefaultsKey;
 extern NSString *const kShowInlineBanglaDefaultsKey;
