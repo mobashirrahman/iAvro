@@ -132,6 +132,7 @@ static const CGFloat kToggleRowHeight = 22.0;
       [NSArray arrayWithObjects:@"Enable Suggestions", kEnableSuggestionsDefaultsKey, nil],
       [NSArray arrayWithObjects:@"Enable AutoCorrect", kEnableAutoCorrectDefaultsKey, nil],
       [NSArray arrayWithObjects:@"Show Bengali inline while typing", kShowInlineBanglaDefaultsKey, nil],
+      [NSArray arrayWithObjects:@"Offer typed English as the last suggestion", kOfferEnglishDefaultsKey, nil],
       nil];
 }
 

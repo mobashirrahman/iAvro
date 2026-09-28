@@ -13,12 +13,12 @@
 #import "RegexKitLite.h"
 #import "AvroParser.h"
 #import "AutoCorrect.h"
-
-static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
+#import "SettingsKeys.h"
 
 @interface AvroKeyboardController ()
 - (NSString *)compositionDisplayString;
 - (NSString *)stringFromCandidate:(id)candidate;
+- (void)addEnglishCandidateRemembering:(NSString *)prevString;
 @end
 
 @implementation AvroKeyboardController
@@ -95,6 +95,7 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
                         }
                     }
                 }
+                [self addEnglishCandidateRemembering:prevString];
                 if (_prevSelected >= 0 && _prevSelected < [_currentCandidates count]) {
                     _selectedCandidateIndex = _prevSelected;
                 } else {
@@ -103,8 +104,25 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
             }
             else {
                 [_currentCandidates addObject:[self prefix]];
+                [self addEnglishCandidateRemembering:nil];
             }
         }
+    }
+}
+
+// Windows Avro offers the typed Roman text as the last choice, so English
+// words can be typed without switching input sources. Choosing it is
+// remembered like any other candidate: the weight cache stores the raw term.
+- (void)addEnglishCandidateRemembering:(NSString *)prevString {
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:kOfferEnglishDefaultsKey]) {
+        return;
+    }
+    if ([_currentCandidates containsObject:_composedBuffer]) {
+        return;
+    }
+    [_currentCandidates addObject:[[_composedBuffer copy] autorelease]];
+    if (_prevSelected == -1 && prevString && [prevString isEqualToString:[self term]]) {
+        _prevSelected = (int)[_currentCandidates count] - 1;
     }
 }
 
@@ -168,7 +186,12 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
             if ((comp && _prevSelected == -1) == NO) {
                 NSUInteger prefixLen = [[self prefix] length];
                 NSUInteger suffixLen = [[self suffix] length];
-                if (prefixLen + suffixLen <= [candidateText length]) {
+                if ([candidateText isEqualToString:_composedBuffer]) {
+                    // English candidate: its prefix/suffix are Roman, not the
+                    // parsed lengths above, so remember the raw term itself.
+                    [[CacheManager sharedInstance] setString:[self term] forKey:[self term]];
+                }
+                else if (prefixLen + suffixLen <= [candidateText length]) {
                     NSRange range = NSMakeRange(prefixLen,
                                                 [candidateText length] - (prefixLen + suffixLen));
                     [[CacheManager sharedInstance] setString:[candidateText substringWithRange:range] forKey:[self term]];

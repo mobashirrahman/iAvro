@@ -2,5 +2,5 @@
 
 extern NSString *const kEnableAutoCorrectDefaultsKey;
 extern NSString *const kEnableSuggestionsDefaultsKey;
-extern NSString *const
-    kShowInlineBanglaDefaultsKey; // existing key may be defined elsewhere
+extern NSString *const kOfferEnglishDefaultsKey;
+extern NSString *const kShowInlineBanglaDefaultsKey;
