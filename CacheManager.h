@@ -16,6 +16,7 @@
 + (CacheManager *)sharedInstance;
 
 - (void)persist;
+- (void)schedulePersist;
 
 // TODO - Rewrite the CacheManager with meaningful methods
 

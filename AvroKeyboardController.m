@@ -201,8 +201,16 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
 
     _usedArrowKeys = false;
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
+        [[CacheManager sharedInstance] schedulePersist];
+    }
+}
+
+- (void)deactivateServer:(id)sender {
+    // Flush any pending debounced save when the user switches away
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
         [[CacheManager sharedInstance] persist];
     }
+    [super deactivateServer:sender];
 }
 
 - (void)commitComposition:(id)sender {

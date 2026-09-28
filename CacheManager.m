@@ -86,12 +86,20 @@ static CacheManager* sharedInstance = nil;
 }
 
 - (void)persist {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(persist) object:nil];
     if (!_weightCache) {
         return;
     }
     NSString *folder = [self getSharedFolder];
     [[NSFileManager defaultManager] createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:NULL];
     [_weightCache writeToFile:[folder stringByAppendingPathComponent:@"weight.plist"] atomically:YES];
+}
+
+// Coalesces writes: weight.plist is rewritten whole, so saving after every
+// committed word blocked typing as the file grew.
+- (void)schedulePersist {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(persist) object:nil];
+    [self performSelector:@selector(persist) withObject:nil afterDelay:2.0];
 }
 
 - (NSString*)getSharedFolder {
