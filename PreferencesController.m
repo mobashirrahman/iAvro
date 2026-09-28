@@ -38,13 +38,12 @@
 }
 
 - (void)awakeFromNib {
+  // Before sizing the window: this grows the General view.
+  [self addGeneralToggles];
+
   [[self window] setContentSize:[_generalView frame].size];
   [[[self window] contentView] addSubview:_generalView];
   [[[self window] contentView] setWantsLayer:YES];
-
-  [self addInlineBanglaPreferenceToggle];
-  [self addAutoCorrectPreferenceToggle];
-  [self addSuggestionPreferenceToggle];
 
   // Load Credits
   [_aboutContent
@@ -123,84 +122,68 @@
   [_autoCorrectController setFilterPredicate:predicate];
 }
 
-static const NSInteger kInlineBanglaToggleTag = 1001;
-static const NSInteger kAutoCorrectToggleTag = 1002;
-static const NSInteger kSuggestionToggleTag = 1003;
+static const NSInteger kFirstGeneralToggleTag = 1001;
+static const CGFloat kToggleRowHeight = 22.0;
 
-- (void)addInlineBanglaPreferenceToggle {
+// Checkboxes added in code, in display order: { title, defaults key }.
+// New phonetic options go here rather than in the nib.
+- (NSArray *)generalToggles {
+  return [NSArray arrayWithObjects:
+      [NSArray arrayWithObjects:@"Enable Suggestions", kEnableSuggestionsDefaultsKey, nil],
+      [NSArray arrayWithObjects:@"Enable AutoCorrect", kEnableAutoCorrectDefaultsKey, nil],
+      [NSArray arrayWithObjects:@"Show Bengali inline while typing", kShowInlineBanglaDefaultsKey, nil],
+      nil];
+}
+
+// Grows the General view and stacks the toggles under the nib's own
+// controls. They used to sit at fixed offsets that overlapped the nib's
+// checkboxes.
+- (void)addGeneralToggles {
   if (!_generalView) {
     return;
   }
   // awakeFromNib can run more than once; don't stack duplicates.
-  if ([_generalView viewWithTag:kInlineBanglaToggleTag]) {
+  if ([_generalView viewWithTag:kFirstGeneralToggleTag]) {
     return;
   }
 
-  NSRect frame = NSMakeRect(198.0, 0.0, 250.0, 18.0);
-  NSButton *inlineToggle = [[NSButton alloc] initWithFrame:frame];
-  [inlineToggle setButtonType:NSSwitchButton];
-  [inlineToggle setTitle:@"Show Bengali inline while typing"];
-  [inlineToggle setBezelStyle:NSBezelStyleRegularSquare];
-  [inlineToggle setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
-  [inlineToggle bind:@"value"
-            toObject:[NSUserDefaultsController sharedUserDefaultsController]
-         withKeyPath:[NSString stringWithFormat:@"values.%@",
-                                                kShowInlineBanglaDefaultsKey]
-             options:nil];
+  NSArray *toggles = [self generalToggles];
+  CGFloat added = kToggleRowHeight * [toggles count];
 
-  [inlineToggle setTag:kInlineBanglaToggleTag];
-  [_generalView addSubview:inlineToggle];
-  [inlineToggle release];
-}
-
-- (void)addAutoCorrectPreferenceToggle {
-  if (!_generalView) {
-    return;
+  // Make room at the bottom by shifting the nib's controls up. Autoresizing
+  // is off meanwhile, or their flexible margins would move them twice.
+  BOOL autoresizes = [_generalView autoresizesSubviews];
+  [_generalView setAutoresizesSubviews:NO];
+  NSRect viewFrame = [_generalView frame];
+  viewFrame.size.height += added;
+  [_generalView setFrame:viewFrame];
+  for (NSView *subview in [_generalView subviews]) {
+    NSPoint origin = [subview frame].origin;
+    origin.y += added;
+    [subview setFrameOrigin:origin];
   }
-  if ([_generalView viewWithTag:kAutoCorrectToggleTag]) {
-    return;
+  [_generalView setAutoresizesSubviews:autoresizes];
+
+  NSUInteger i;
+  for (i = 0; i < [toggles count]; i++) {
+    NSArray *spec = [toggles objectAtIndex:i];
+    // 18pt matches the nib's bottom margin
+    CGFloat y = 18.0 + added - kToggleRowHeight * (i + 1);
+    NSButton *toggle =
+        [[NSButton alloc] initWithFrame:NSMakeRect(198.0, y, 250.0, 18.0)];
+    [toggle setTag:kFirstGeneralToggleTag + i];
+    [toggle setButtonType:NSSwitchButton];
+    [toggle setTitle:[spec objectAtIndex:0]];
+    [toggle setBezelStyle:NSBezelStyleRegularSquare];
+    [toggle setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
+    [toggle bind:@"value"
+           toObject:[NSUserDefaultsController sharedUserDefaultsController]
+        withKeyPath:[NSString stringWithFormat:@"values.%@",
+                                               [spec objectAtIndex:1]]
+            options:nil];
+    [_generalView addSubview:toggle];
+    [toggle release];
   }
-
-  NSRect frame = NSMakeRect(198.0, 24.0, 250.0, 18.0);
-  NSButton *toggle = [[NSButton alloc] initWithFrame:frame];
-  [toggle setTag:kAutoCorrectToggleTag];
-  [toggle setButtonType:NSSwitchButton];
-  [toggle setTitle:@"Enable AutoCorrect"];
-  [toggle setBezelStyle:NSBezelStyleRegularSquare];
-  [toggle setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
-  [toggle bind:@"value"
-         toObject:[NSUserDefaultsController sharedUserDefaultsController]
-      withKeyPath:[NSString stringWithFormat:@"values.%@",
-                                             kEnableAutoCorrectDefaultsKey]
-          options:nil];
-
-  [_generalView addSubview:toggle];
-  [toggle release];
-}
-
-- (void)addSuggestionPreferenceToggle {
-  if (!_generalView) {
-    return;
-  }
-  if ([_generalView viewWithTag:kSuggestionToggleTag]) {
-    return;
-  }
-
-  NSRect frame = NSMakeRect(198.0, 48.0, 250.0, 18.0);
-  NSButton *toggle = [[NSButton alloc] initWithFrame:frame];
-  [toggle setTag:kSuggestionToggleTag];
-  [toggle setButtonType:NSSwitchButton];
-  [toggle setTitle:@"Enable Suggestions"];
-  [toggle setBezelStyle:NSBezelStyleRegularSquare];
-  [toggle setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
-  [toggle bind:@"value"
-         toObject:[NSUserDefaultsController sharedUserDefaultsController]
-      withKeyPath:[NSString stringWithFormat:@"values.%@",
-                                             kEnableSuggestionsDefaultsKey]
-          options:nil];
-
-  [_generalView addSubview:toggle];
-  [toggle release];
 }
 
 @end
