@@ -24,5 +24,9 @@
 // User entries overlay Application Support storage (bundle stays pristine).
 - (void)setUserAutoCorrect:(NSString *)correction forTerm:(NSString *)term;
 - (void)removeUserAutoCorrectForTerm:(NSString *)term;
+- (void)deleteAutoCorrectForTerm:(NSString *)term;
+- (void)setUserAutoCorrectEntries:(NSDictionary *)entries;
+- (NSString *)correctionForValue:(NSString *)value term:(NSString *)term;
++ (NSDictionary *)entriesFromDictionaryFile:(NSString *)path error:(NSError **)error;
 
 @end

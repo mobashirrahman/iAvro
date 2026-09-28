@@ -7,13 +7,19 @@
 
 #import <Cocoa/Cocoa.h>
 
-@interface PreferencesController : NSWindowController {
+@interface PreferencesController : NSWindowController <NSTextFieldDelegate> {
 @private
     IBOutlet NSView*                    _aboutView;
     IBOutlet NSView*                    _autoCorrectView;
     IBOutlet NSView*                    _generalView;
     IBOutlet NSTextView*                _aboutContent;
     IBOutlet NSArrayController*         _autoCorrectController;
+
+    NSTextField*                        _replaceField;
+    NSTextField*                        _withField;
+    NSTextField*                        _previewLabel;
+    NSButton*                           _addButton;
+    NSButton*                           _deleteButton;
 
     NSInteger                           _currentViewTag;
     NSMutableArray*                     _autoCorrectItemsArray;

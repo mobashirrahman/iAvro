@@ -9,6 +9,7 @@
 #import "AutoCorrect.h"
 #import "AutoCorrectItem.h"
 #import "SettingsKeys.h"
+#import "AvroParser.h"
 
 @implementation PreferencesController
 
@@ -33,13 +34,22 @@
 }
 
 - (void)dealloc {
+  if (_addButton) {
+    [_autoCorrectController removeObserver:self forKeyPath:@"selectionIndexes"];
+  }
+  [_replaceField release];
+  [_withField release];
+  [_previewLabel release];
+  [_addButton release];
+  [_deleteButton release];
   [_autoCorrectItemsArray release];
   [super dealloc];
 }
 
 - (void)awakeFromNib {
-  // Before sizing the window: this grows the General view.
+  // Before sizing the window: these grow their views.
   [self addGeneralToggles];
+  [self addAutoCorrectEditor];
 
   [[self window] setContentSize:[_generalView frame].size];
   [[[self window] contentView] addSubview:_generalView];
@@ -184,6 +194,218 @@ static const CGFloat kToggleRowHeight = 22.0;
             options:nil];
     [_generalView addSubview:toggle];
     [toggle release];
+  }
+}
+
+#pragma mark - AutoCorrect editor
+
+static const CGFloat kEditorHeight = 64.0;
+
+- (NSTextField *)editorFieldWithFrame:(NSRect)frame placeholder:(NSString *)placeholder {
+  NSTextField *field = [[NSTextField alloc] initWithFrame:frame];
+  [[field cell] setPlaceholderString:placeholder];
+  [[field cell] setScrollable:YES];
+  [field setDelegate:self];
+  [field setAutoresizingMask:(NSViewMaxXMargin | NSViewMaxYMargin)];
+  [_autoCorrectView addSubview:field];
+  return field;
+}
+
+- (NSButton *)editorButtonWithFrame:(NSRect)frame title:(NSString *)title action:(SEL)action {
+  NSButton *button = [[NSButton alloc] initWithFrame:frame];
+  [button setBezelStyle:NSBezelStyleRounded];
+  [button setTitle:title];
+  [button setTarget:self];
+  [button setAction:action];
+  [button setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+  [_autoCorrectView addSubview:button];
+  return button;
+}
+
+// Ported from Windows Avro's AutoCorrect editor: add, update, delete and
+// import entries. The nib only has a read-only list, so the controls are
+// added here under the table.
+- (void)addAutoCorrectEditor {
+  if (!_autoCorrectView || _addButton) {
+    return;
+  }
+  BOOL autoresizes = [_autoCorrectView autoresizesSubviews];
+  [_autoCorrectView setAutoresizesSubviews:NO];
+  NSRect viewFrame = [_autoCorrectView frame];
+  viewFrame.size.height += kEditorHeight;
+  [_autoCorrectView setFrame:viewFrame];
+  for (NSView *subview in [_autoCorrectView subviews]) {
+    NSPoint origin = [subview frame].origin;
+    origin.y += kEditorHeight;
+    [subview setFrameOrigin:origin];
+  }
+  [_autoCorrectView setAutoresizesSubviews:autoresizes];
+
+  _replaceField = [self editorFieldWithFrame:NSMakeRect(20, 50, 120, 22)
+                                 placeholder:@"Replace"];
+  _withField = [self editorFieldWithFrame:NSMakeRect(146, 50, 150, 22)
+                              placeholder:@"With (Roman or Bangla)"];
+  _addButton = [self editorButtonWithFrame:NSMakeRect(298, 44, 138, 32)
+                                     title:@"Add/Update"
+                                    action:@selector(addOrUpdateAutoCorrect:)];
+  _deleteButton = [self editorButtonWithFrame:NSMakeRect(298, 12, 69, 32)
+                                        title:@"Delete"
+                                       action:@selector(deleteAutoCorrect:)];
+  [[self editorButtonWithFrame:NSMakeRect(367, 12, 69, 32)
+                         title:@"Import…"
+                        action:@selector(importAutoCorrect:)] release];
+
+  _previewLabel = [[NSTextField alloc] initWithFrame:NSMakeRect(20, 20, 276, 17)];
+  [_previewLabel setEditable:NO];
+  [_previewLabel setBordered:NO];
+  [_previewLabel setDrawsBackground:NO];
+  [_previewLabel setTextColor:[NSColor secondaryLabelColor]];
+  [_previewLabel setAutoresizingMask:(NSViewMaxXMargin | NSViewMaxYMargin)];
+  [_autoCorrectView addSubview:_previewLabel];
+
+  [_autoCorrectController addObserver:self
+                           forKeyPath:@"selectionIndexes"
+                              options:0
+                              context:NULL];
+  [self updateAutoCorrectEditor];
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary *)change
+                       context:(void *)context {
+  if (object == _autoCorrectController) {
+    NSArray *selected = [_autoCorrectController selectedObjects];
+    if ([selected count] == 1) {
+      AutoCorrectItem *item = [selected objectAtIndex:0];
+      [_replaceField setStringValue:item.replace];
+      [_withField setStringValue:item.with];
+    }
+    [self updateAutoCorrectEditor];
+  }
+}
+
+- (void)controlTextDidChange:(NSNotification *)notification {
+  [self updateAutoCorrectEditor];
+}
+
+- (NSString *)editorCorrection {
+  return [[AutoCorrect sharedInstance] correctionForValue:[self trimmed:_withField]
+                                                     term:[self trimmed:_replaceField]];
+}
+
+- (NSString *)trimmed:(NSTextField *)field {
+  return [[field stringValue]
+      stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+}
+
+- (void)updateAutoCorrectEditor {
+  BOOL complete = [[self trimmed:_replaceField] length] > 0 &&
+                  [[self trimmed:_withField] length] > 0;
+  [_addButton setEnabled:complete];
+  [_deleteButton setEnabled:[[_autoCorrectController selectedObjects] count] > 0];
+  [_previewLabel setStringValue:complete
+                     ? [NSString stringWithFormat:@"Preview: %@", [self editorCorrection]]
+                     : @""];
+}
+
+- (AutoCorrectItem *)itemForKey:(NSString *)key {
+  for (AutoCorrectItem *item in _autoCorrectItemsArray) {
+    if ([item.replace isEqualToString:key]) {
+      return item;
+    }
+  }
+  return nil;
+}
+
+// Shows `correction` for `key` in the list, adding a row if needed.
+- (AutoCorrectItem *)showEntry:(NSString *)key correction:(NSString *)correction {
+  AutoCorrectItem *item = [self itemForKey:key];
+  if (item) {
+    item.with = correction;
+  } else {
+    item = [[[AutoCorrectItem alloc] init] autorelease];
+    item.replace = key;
+    item.with = correction;
+    [_autoCorrectController addObject:item];
+  }
+  return item;
+}
+
+- (IBAction)addOrUpdateAutoCorrect:(id)sender {
+  NSString *term = [self trimmed:_replaceField];
+  NSString *correction = [self editorCorrection];
+  if ([term length] == 0 || [correction length] == 0) {
+    return;
+  }
+  [[AutoCorrect sharedInstance] setUserAutoCorrect:correction forTerm:term];
+  NSString *key = [[AvroParser sharedInstance] fix:term];
+  AutoCorrectItem *item = [self showEntry:key correction:correction];
+  [_autoCorrectController setSelectedObjects:[NSArray arrayWithObject:item]];
+  [_replaceField setStringValue:@""];
+  [_withField setStringValue:@""];
+  [self updateAutoCorrectEditor];
+  [[self window] makeFirstResponder:_replaceField];
+}
+
+- (IBAction)deleteAutoCorrect:(id)sender {
+  NSArray *selected = [[[_autoCorrectController selectedObjects] copy] autorelease];
+  for (AutoCorrectItem *item in selected) {
+    [[AutoCorrect sharedInstance] deleteAutoCorrectForTerm:item.replace];
+  }
+  [_autoCorrectController removeObjects:selected];
+  [_replaceField setStringValue:@""];
+  [_withField setStringValue:@""];
+  [self updateAutoCorrectEditor];
+}
+
+- (IBAction)importAutoCorrect:(id)sender {
+  NSOpenPanel *panel = [NSOpenPanel openPanel];
+  [panel setMessage:@"Choose an Avro AutoCorrect dictionary (.dct): one \"term value\" pair per line."];
+  if ([panel runModal] != NSModalResponseOK) {
+    return;
+  }
+  NSError *error = nil;
+  NSDictionary *raw = [AutoCorrect entriesFromDictionaryFile:[[panel URL] path] error:&error];
+  if (!raw) {
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:@"Cannot import the AutoCorrect dictionary"];
+    [alert setInformativeText:@"The file must be UTF-8 text with one \"term value\" pair per line."];
+    [alert runModal];
+    return;
+  }
+
+  AutoCorrect *autoCorrect = [AutoCorrect sharedInstance];
+  NSMutableDictionary *added = [NSMutableDictionary dictionary];
+  NSMutableDictionary *conflicts = [NSMutableDictionary dictionary];
+  for (NSString *term in raw) {
+    NSString *key = [[AvroParser sharedInstance] fix:term];
+    NSString *correction = [autoCorrect correctionForValue:[raw objectForKey:term] term:term];
+    NSString *current = [[autoCorrect autoCorrectEntries] objectForKey:key];
+    if (!current) {
+      [added setObject:correction forKey:key];
+    } else if (![current isEqualToString:correction]) {
+      [conflicts setObject:correction forKey:key];
+    }
+  }
+
+  // Windows asks per entry; one question for all conflicts is enough here.
+  if ([conflicts count] > 0) {
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:[NSString stringWithFormat:
+        @"%lu imported entries differ from existing ones",
+        (unsigned long)[conflicts count]]];
+    [alert setInformativeText:@"Replace the existing entries with the imported ones?"];
+    [alert addButtonWithTitle:@"Keep Existing"];
+    [alert addButtonWithTitle:@"Replace"];
+    if ([alert runModal] == NSAlertSecondButtonReturn) {
+      [added addEntriesFromDictionary:conflicts];
+    }
+  }
+
+  [autoCorrect setUserAutoCorrectEntries:added];
+  for (NSString *key in added) {
+    [self showEntry:key correction:[added objectForKey:key]];
   }
 }
 
