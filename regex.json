@@ -840,7 +840,19 @@
     {
       "find": "x",
       "replace": "((ক্স)|ষ)",
-      "rules": []
+      "rules": [
+        {
+          "matches": [
+            {
+              "type": "prefix",
+              "scope": "punctuation",
+              "value": "",
+              "negative": "NO"
+            }
+          ],
+          "replace": "((এক্স)|(ক্স)|ষ)"
+        }
+      ]
     },
     {
       "find": "y",
