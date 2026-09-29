@@ -217,12 +217,48 @@ static void test_autocorrect_overlay(void) {
   }
 }
 
+static void test_selection_counts(void) {
+  SECTION("selection counts");
+  CacheManager *cache = [CacheManager sharedInstance];
+
+  NSString *word = @"__count_probe_word__";
+  [cache forgetCountsForKey:word];
+  CHECK([cache countForKey:word] == 0, "unknown word starts at zero");
+  [cache incrementCountForKey:word];
+  [cache incrementCountForKey:word];
+  [cache incrementCountForKey:word];
+  CHECK([cache countForKey:word] == 3, "increments accumulate");
+  [cache incrementCountForKey:nil];
+  CHECK([cache countForKey:nil] == 0, "nil key is safe and reads as zero");
+  [cache forgetCountsForKey:nil];
+
+  // Counts must survive a round trip, and must not corrupt weight.plist.
+  NSString *folder = supportFolder();
+  NSString *countsPath =
+      [folder stringByAppendingPathComponent:@"weight-counts.plist"];
+  [cache persist];
+  NSDictionary *onDisk = [NSDictionary dictionaryWithContentsOfFile:countsPath];
+  CHECK(onDisk != nil, "weight-counts.plist written");
+  CHECK([[onDisk objectForKey:word] unsignedIntegerValue] == 3,
+        "count persisted with the right value");
+  CHECK([NSDictionary dictionaryWithContentsOfFile:
+             [folder stringByAppendingPathComponent:@"weight.plist"]] != nil,
+        "weight.plist still written");
+
+  [cache forgetCountsForKey:word];
+  [cache persist];
+  CHECK([[NSDictionary dictionaryWithContentsOfFile:countsPath]
+             objectForKey:word] == nil,
+        "forget removes the count from disk");
+}
+
 int main(void) {
   NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
   @autoreleasepool {
     test_cache_bounds();
     test_cache_nil_guards();
     test_weight_persist();
+    test_selection_counts();
     test_autocorrect_overlay();
   }
   int rc = test_report("test_storage");

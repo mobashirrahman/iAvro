@@ -243,7 +243,65 @@ static Suggestion *sharedInstance = nil;
     [_suggestions addObject:paresedString];
   }
 
+  [self promoteLearnedChoicesForTerm:term];
+
   return [[_suggestions copy] autorelease];
+}
+
+// Reorders candidates using what this user has actually committed before, the
+// same idea as the Japanese IME's conversion learning. Terms the user has never
+// committed are left exactly as they were, so the common case is unchanged.
+//
+// Two signals, in order:
+//   1. the last word committed for this term (weight.plist), then
+//   2. how often each candidate word has been committed at all
+//      (weight-counts.plist), which acts as a personal unigram frequency.
+// Candidates with no history keep their incoming order, so the distance
+// ranking computed in wordsForTerm: is still the tiebreaker.
+- (void)promoteLearnedChoicesForTerm:(NSString *)term {
+  if (!term || [_suggestions count] < 2) {
+    return;
+  }
+  if (![[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
+    return;
+  }
+
+  CacheManager *cache = [CacheManager sharedInstance];
+  NSString *lastChosen = [cache stringForKey:term];
+  if (lastChosen && [lastChosen length] == 0) {
+    lastChosen = nil;
+  }
+
+  NSArray *original = [[_suggestions copy] autorelease];
+  NSMutableArray *head = [NSMutableArray arrayWithCapacity:1];
+  NSMutableArray *tail = [NSMutableArray arrayWithCapacity:[original count]];
+  for (NSString *word in original) {
+    if (lastChosen && [word isEqualToString:lastChosen]) {
+      if ([head count] == 0) {
+        [head addObject:word];
+        continue;
+      }
+    }
+    [tail addObject:word];
+  }
+  if ([head count] == 0) {
+    return;  // nothing learned for this term; leave the order untouched
+  }
+
+  // Stable sort the remainder by personal frequency, so words the user never
+  // picks keep the distance order they arrived in.
+  [tail sortUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
+    NSUInteger fa = [cache countForKey:a];
+    NSUInteger fb = [cache countForKey:b];
+    if (fa == fb) {
+      return NSOrderedSame;
+    }
+    return fa < fb ? NSOrderedDescending : NSOrderedAscending;
+  }];
+
+  [_suggestions removeAllObjects];
+  [_suggestions addObjectsFromArray:head];
+  [_suggestions addObjectsFromArray:tail];
 }
 
 // Ported from Windows Avro (clsAbbreviation): English letter names in

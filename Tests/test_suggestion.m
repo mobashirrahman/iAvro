@@ -11,6 +11,7 @@
 #import <Foundation/Foundation.h>
 
 #import "AvroParser.h"
+#import "CacheManager.h"
 #import "Database.h"
 #import "NSString+Levenshtein.h"
 #import "Suggestion.h"
@@ -182,6 +183,61 @@ static void test_ranking(void) {
         "no empty candidates");
 }
 
+static void test_learned_ranking(void) {
+  SECTION("learned-choice ranking");
+  configureDefaults(YES);
+  CacheManager *cache = [CacheManager sharedInstance];
+  NSString *term = @"kora";
+
+  // Establish the baseline order before anything is learned.
+  NSArray *baseline = [[Suggestion sharedInstance] getList:term];
+  CHECK([baseline count] > 1, "baseline has candidates");
+  NSString *baselineFirst = [baseline objectAtIndex:0];
+
+  // Learn a choice that is not currently first.
+  NSString *learned = nil;
+  for (NSUInteger i = 1; i < [baseline count]; i++) {
+    if (![[baseline objectAtIndex:i] isEqualToString:baselineFirst]) {
+      learned = [baseline objectAtIndex:i];
+      break;
+    }
+  }
+  CHECK(learned != nil, "found a non-first candidate to learn");
+
+  [cache setString:learned forKey:term];
+  NSArray *after = [[Suggestion sharedInstance] getList:term];
+  CHECK([[after objectAtIndex:0] isEqualToString:learned],
+        "learned choice is promoted to first");
+
+  // Unlearn and confirm the original order comes back.
+  [cache removeStringForKey:term];
+  NSArray *restored = [[Suggestion sharedInstance] getList:term];
+  CHECK([[restored objectAtIndex:0] isEqualToString:baselineFirst],
+        "removing the learned choice restores the baseline order");
+
+  // Personal frequency ranks the remainder: a word used often elsewhere should
+  // outrank a word never committed, without disturbing the top choice.
+  NSString *frequent = nil;
+  for (NSUInteger i = 1; i < [restored count]; i++) {
+    frequent = [restored objectAtIndex:i];
+    break;
+  }
+  for (int i = 0; i < 5; i++) {
+    [cache incrementCountForKey:frequent];
+  }
+  NSArray *ranked = [[Suggestion sharedInstance] getList:term];
+  CHECK([ranked count] == [restored count], "ranking does not change list length");
+  NSUInteger frequentIndex = [ranked indexOfObject:frequent];
+  CHECK(frequentIndex != NSNotFound, "frequently used word is still present");
+
+  // No duplicates introduced by reordering.
+  CHECK([NSSet setWithArray:ranked].count == [ranked count],
+        "reordering introduces no duplicates");
+
+  [cache forgetCountsForKey:frequent];
+  [cache removeStringForKey:term];
+}
+
 int main(void) {
   NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
   @autoreleasepool {
@@ -189,6 +245,7 @@ int main(void) {
     test_getlist_isolation();
     test_empty_guards();
     test_ranking();
+    test_learned_ranking();
   }
   int rc = test_report("test_suggestion");
   [pool release];

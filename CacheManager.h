@@ -11,6 +11,7 @@
     NSMutableDictionary* _weightCache;
     NSMutableDictionary* _phoneticCache;
     NSMutableDictionary* _recentBaseCache;
+    NSMutableDictionary* _countCache;
 }
 
 + (CacheManager *)sharedInstance;
@@ -24,6 +25,11 @@
 - (NSString*)stringForKey:(NSString*)aKey;
 - (void)removeStringForKey:(NSString*)aKey;
 - (void)setString:(NSString*)aString forKey:(NSString*)aKey;
+
+// Selection Counts (how often a term has been committed)
+- (NSUInteger)countForKey:(NSString*)aKey;
+- (void)incrementCountForKey:(NSString*)aKey;
+- (void)forgetCountsForKey:(NSString*)aKey;
 
 // Phonetic Cahce (default for Array)
 - (NSArray*)arrayForKey:(NSString*)aKey;

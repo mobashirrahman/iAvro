@@ -73,6 +73,20 @@ static CacheManager* sharedInstance = nil;
         }
         _phoneticCache = [[NSMutableDictionary alloc] initWithCapacity:0];
         _recentBaseCache = [[NSMutableDictionary alloc] initWithCapacity:0];
+
+        // Selection counts live in their own file so weight.plist keeps the
+        // term -> last-chosen-word shape older builds expect.
+        NSString *countPath =
+            [path stringByDeletingLastPathComponent];
+        countPath = [countPath stringByAppendingPathComponent:@"weight-counts.plist"];
+        if ([fileManager fileExistsAtPath:countPath]) {
+            NSDictionary *loaded =
+                [NSDictionary dictionaryWithContentsOfFile:countPath];
+            _countCache = loaded ? [[loaded mutableCopy] autorelease]
+                                 : [[NSMutableDictionary alloc] initWithCapacity:0];
+        } else {
+            _countCache = [[NSMutableDictionary alloc] initWithCapacity:0];
+        }
     }
     return self;
 }
@@ -82,6 +96,7 @@ static CacheManager* sharedInstance = nil;
     [_phoneticCache release];
     [_recentBaseCache release];
     [_weightCache release];
+    [_countCache release];
     [super dealloc];
 }
 
@@ -93,6 +108,10 @@ static CacheManager* sharedInstance = nil;
     NSString *folder = [self getSharedFolder];
     [[NSFileManager defaultManager] createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:NULL];
     [_weightCache writeToFile:[folder stringByAppendingPathComponent:@"weight.plist"] atomically:YES];
+    if (_countCache) {
+        [_countCache writeToFile:[folder stringByAppendingPathComponent:@"weight-counts.plist"]
+                      atomically:YES];
+    }
 }
 
 // Coalesces writes: weight.plist is rewritten whole, so saving after every
@@ -129,6 +148,31 @@ static CacheManager* sharedInstance = nil;
         return;
     }
     [_weightCache setObject:aString forKey:aKey];
+}
+
+// Selection Counts
+- (NSUInteger)countForKey:(NSString*)aKey {
+    if (!aKey) {
+        return 0;
+    }
+    return [[_countCache objectForKey:aKey] unsignedIntegerValue];
+}
+
+- (void)incrementCountForKey:(NSString*)aKey {
+    if (!aKey) {
+        return;
+    }
+    NSUInteger next = [self countForKey:aKey] + 1;
+    [_countCache setObject:[NSNumber numberWithUnsignedInteger:next] forKey:aKey];
+    [self schedulePersist];
+}
+
+- (void)forgetCountsForKey:(NSString*)aKey {
+    if (!aKey) {
+        return;
+    }
+    [_countCache removeObjectForKey:aKey];
+    [self schedulePersist];
 }
 
 static const NSUInteger kPhoneticCacheLimit = 1000;

@@ -18,6 +18,7 @@
 @interface AvroKeyboardController ()
 - (NSString *)compositionDisplayString;
 - (NSString *)stringFromCandidate:(id)candidate;
+- (void)recordCommitOfCandidate:(NSString *)candidateText;
 - (void)addEnglishCandidateRemembering:(NSString *)prevString;
 - (NSInteger)preferredTransliterationIndex;
 - (BOOL)isClassicMode;
@@ -304,7 +305,26 @@
 
     _usedArrowKeys = false;
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
+        [self recordCommitOfCandidate:candidateText];
         [[CacheManager sharedInstance] schedulePersist];
+    }
+}
+
+// Counts a word only once it has actually been committed. Doing this in
+// candidateSelectionChanged: instead would count every candidate the user
+// merely arrowed past, which would flood the personal frequency with words
+// they never chose.
+- (void)recordCommitOfCandidate:(NSString *)candidateText {
+    if (![candidateText isEqualToString:[self englishCandidate]]) {
+        NSUInteger prefixLen = [[self prefix] length];
+        NSUInteger suffixLen = [[self suffix] length];
+        if (prefixLen + suffixLen > [candidateText length]) {
+            return;
+        }
+        NSRange range = NSMakeRange(prefixLen,
+                                    [candidateText length] - (prefixLen + suffixLen));
+        [[CacheManager sharedInstance] incrementCountForKey:
+            [candidateText substringWithRange:range]];
     }
 }
 
