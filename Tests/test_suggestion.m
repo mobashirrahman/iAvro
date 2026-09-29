@@ -238,49 +238,6 @@ static void test_learned_ranking(void) {
   [cache removeStringForKey:term];
 }
 
-// A cache that survives a change to how input is parsed returns stale
-// candidates. Jo/Nukta is the easy one to miss: it changes how "J" parses,
-// which feeds the edit-distance ranking, which changes candidate order.
-static void test_cache_invalidates_on_parsing_change(void) {
-  SECTION("cache invalidation on a parsing setting");
-  CacheManager *cache = [CacheManager sharedInstance];
-  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-  Suggestion *suggestion = [Suggestion sharedInstance];
-  [defaults setBool:YES forKey:@"IncludeDictionary"];
-  [defaults setBool:NO forKey:@"EnableAutoCorrect"];
-  [defaults setBool:YES forKey:@"EnableSuggestions"];
-
-  // A term whose parsed form differs between the two settings.
-  NSString *term = @"Jor";
-
-  // The answer with the option on, computed from a cold cache.
-  [defaults setBool:YES forKey:@"EnableJoNukta"];
-  [cache removeAllArrays];
-  NSArray *expected = [suggestion wordsForTerm:term];
-  CHECK([expected count] > 0, "the term produces candidates with the option on");
-
-  // Now the real sequence: populate the cache with the option off, which is
-  // what the app does, then switch the option on and ask again through
-  // getList:, the path that decides whether to drop the cache.
-  [defaults setBool:NO forKey:@"EnableJoNukta"];
-  [cache removeAllArrays];
-  [suggestion getList:term];
-  NSArray *stale = [suggestion wordsForTerm:term];
-  CHECK([stale count] > 0, "the term produces candidates with the option off");
-
-  [defaults setBool:YES forKey:@"EnableJoNukta"];
-  [suggestion getList:term];
-  NSArray *actual = [suggestion wordsForTerm:term];
-
-  CHECK(![actual isEqualToArray:stale] || [expected isEqualToArray:stale],
-        "the cached list is not the one built under the old setting");
-  CHECK([actual isEqualToArray:expected],
-        "after the option changes the list matches a cold-cache computation");
-
-  [cache removeAllArrays];
-  [defaults setBool:NO forKey:@"EnableJoNukta"];
-}
-
 static void test_dictionary_coverage(void) {
   SECTION("dictionary coverage (extra words)");
   Database *db = [Database sharedInstance];
@@ -321,7 +278,6 @@ int main(void) {
     test_empty_guards();
     test_ranking();
     test_learned_ranking();
-    test_cache_invalidates_on_parsing_change();
     test_dictionary_coverage();
   }
   int rc = test_report("test_suggestion");

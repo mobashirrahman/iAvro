@@ -179,8 +179,6 @@ static const CGFloat kToggleRowHeight = 22.0;
           @"Tab selects the next suggestion and Shift-Tab the previous one, instead of committing.", nil],
       [NSArray arrayWithObjects:@"Shift-\\ ( | ) types a dot", kPipeToDotDefaultsKey,
           @"Type a plain dot (.) with the | key; a lone . still types দাঁড়ি (।).", nil],
-      [NSArray arrayWithObjects:@"Shift-J types জ় (jo + nukta)", kJoNuktaDefaultsKey,
-          @"Shift-J types জ় instead of জ.", nil],
       nil];
 }
 

@@ -127,16 +127,13 @@ static Suggestion *sharedInstance = nil;
   return result;
 }
 
-// Cached word lists depend on any setting that changes parsing or which
-// sources are consulted, so drop them whenever one of those changes. The
-// Jo/Nukta option is easy to miss: it changes how "J" parses, which changes the
-// edit distances, which changes candidate order. Leaving it out meant the
-// setting appeared not to work until the cache happened to evict.
+// Cached word lists depend on which sources are consulted, so drop them when
+// either toggle changes. AutoCorrect entries also feed these lists and are
+// dropped through AutoCorrect's own entriesDidChange.
 - (void)invalidateCacheIfPreferencesChanged {
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
   NSInteger flags = ([defaults boolForKey:kEnableAutoCorrectDefaultsKey] ? 1 : 0) |
-                    ([defaults boolForKey:kEnableSuggestionsDefaultsKey] ? 2 : 0) |
-                    ([defaults boolForKey:kJoNuktaDefaultsKey] ? 4 : 0);
+                    ([defaults boolForKey:kEnableSuggestionsDefaultsKey] ? 2 : 0);
   if (flags != _cachedPreferenceFlags) {
     [[CacheManager sharedInstance] removeAllArrays];
     _cachedPreferenceFlags = flags;

@@ -248,7 +248,6 @@ the way I assumed.
 | L5 | Enable **Classic phonetic**, type `ami` | Bangla committed with no suggestion window |
 | L6 | Enable **Prefer exact transliteration**, type `kotha` | the literal conversion is preferred |
 | L7 | Enable **Pipe to dot**, type `|` | produces `.` |
-| L8 | Enable **Jo/Nukta**, type the relevant input | note the difference |
 
 ---
 
