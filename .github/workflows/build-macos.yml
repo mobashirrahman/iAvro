@@ -124,11 +124,39 @@ jobs:
           APP_PATH="build/Build/Products/Release/Avro Keyboard.app"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "AvroKeyboard-macOS.zip"
 
+      # Runs here rather than in the release job because sign_update is a macOS
+      # binary and the pod that ships it is only present after pod install.
+      # Skipped when the secret is absent so forks still build; Sparkle will
+      # reject an unsigned archive, so the feed is only written when signed.
+      - name: Sign update archive with Sparkle EdDSA
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          ZIP="AvroKeyboard-macOS.zip"
+          SIGNED="AvroKeyboard-macOS-signed.zip"
+          if [ -z "${SPARKLE_PRIVATE_KEY:-}" ]; then
+            echo "::notice::SPARKLE_PRIVATE_KEY not set - releasing unsigned archive"
+            exit 0
+          fi
+          TOOL="Pods/Sparkle/bin/sign_update"
+          [ -x "$TOOL" ] || { echo "::error::$TOOL missing"; exit 1; }
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/eddsa.key"
+          "$TOOL" -s -f "$RUNNER_TEMP/eddsa.key" "$ZIP" | tee eddsa-signature.txt
+          mv "$ZIP" "$SIGNED"
+          rm -f "$RUNNER_TEMP/eddsa.key"
+          echo "Signed: $SIGNED"
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: AvroKeyboard-macOS
-          path: AvroKeyboard-macOS.zip
+          path: |
+            AvroKeyboard-macOS.zip
+            AvroKeyboard-macOS-signed.zip
+            eddsa-signature.txt
+          if-no-files-found: warn
 
   # Tag-driven release. Uses no Apple credentials: the app is distributed
   # ad-hoc signed, and users approve it once via right-click -> Open. See the
@@ -162,23 +190,82 @@ jobs:
             exit 1
           fi
 
+      - name: Write appcast
+        run: |
+          set -euo pipefail
+          SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
+          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Info.plist)
+          URL="https://github.com/mobashirrahman/iAvro/releases/download/${GITHUB_REF_NAME}/AvroKeyboard-macOS.zip"
+
+          ASSET="dist/AvroKeyboard-macOS.zip"
+          if [ -f dist/AvroKeyboard-macOS-signed.zip ]; then
+            ASSET="dist/AvroKeyboard-macOS-signed.zip"
+          fi
+
+          if [ ! -f dist/eddsa-signature.txt ]; then
+            echo "::notice::No EdDSA signature - skipping appcast (auto-update needs a signed archive)"
+            exit 0
+          fi
+
+          ED=$(cat dist/eddsa-signature.txt)
+          LENGTH=$(stat -c%s "$ASSET")
+          PUB_DATE=$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')
+          {
+            printf '<?xml version="1.0" encoding="utf-8"?>\n'
+            printf '<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">\n'
+            printf '  <channel>\n'
+            printf '    <title>Avro Keyboard</title>\n'
+            printf '    <link>https://github.com/mobashirrahman/iAvro</link>\n'
+            printf '    <description>Updates for Avro Keyboard.</description>\n'
+            printf '    <item>\n'
+            printf '      <title>Version %s</title>\n' "$SHORT"
+            printf '      <pubDate>%s</pubDate>\n' "$PUB_DATE"
+            printf '      <sparkle:releaseNotesLink>https://github.com/mobashirrahman/iAvro/releases/tag/%s</sparkle:releaseNotesLink>\n' "$GITHUB_REF_NAME"
+            printf '      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>\n'
+            printf '      <enclosure url="%s" length="%s" type="application/octet-stream" %s />\n' "$URL" "$LENGTH" "$ED"
+            printf '    </item>\n'
+            printf '  </channel>\n'
+            printf '</rss>\n'
+          } > appcast.xml
+          xmllint --noout appcast.xml
+          echo "appcast.xml written: version=$SHORT length=$LENGTH"
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
           BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Info.plist)
           NOTES=$(mktemp)
-          # Use the annotated tag message as release notes when present.
-          git tag -l --format='%(contents)' "$TAG" > "$NOTES"
+          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > "$NOTES"
           if [ ! -s "$NOTES" ]; then
             printf 'Avro Keyboard %s (build %s)\n\nUniversal build for Apple Silicon and Intel Macs.\n' \
               "$SHORT" "$BUILD" > "$NOTES"
           fi
-          gh release create "$TAG" \
-            dist/AvroKeyboard-macOS.zip \
+          ASSET="dist/AvroKeyboard-macOS.zip"
+          if [ -f dist/AvroKeyboard-macOS-signed.zip ]; then
+            ASSET="dist/AvroKeyboard-macOS-signed.zip"
+          fi
+          gh release create "$GITHUB_REF_NAME" "$ASSET" \
             --title "Avro Keyboard $SHORT" \
             --notes-file "$NOTES"
-          echo "::notice::Release $TAG published"
+          echo "::notice::Release $GITHUB_REF_NAME published"
+
+      - name: Publish appcast to the feed branch
+        if: always() && hashFiles('appcast.xml') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # SUFeedURL reads appcast.xml from master on raw.githubusercontent.com.
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          if git diff --cached --quiet; then
+            echo "appcast.xml unchanged"
+            exit 0
+          fi
+          git commit -m "Update appcast for $GITHUB_REF_NAME"
+          git push origin "HEAD:master"
+          echo "::notice::appcast.xml published to master"
