@@ -2,7 +2,10 @@
 
 Notable changes, newest first. Version numbers follow `CFBundleShortVersionString`.
 
-## Unreleased — after 2.0.6
+## 2.0.6
+
+> Not notarized, and not yet verified in a live input session. See the install
+> note in `README.md`.
 
 ### Fixed
 - **Patterns `TH`, `H` and `qq` were silently dropped.** The pattern tables are
