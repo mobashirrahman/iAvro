@@ -271,7 +271,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          xmllint --noout dist/appcast.xml
+          # python3, not xmllint: this job runs on Linux, where xmllint is
+          # not installed. The macOS job previously used it too, but that step
+          # was always skipped, so the mistake went unnoticed.
+          python3 -c 'import xml.etree.ElementTree as ET; ET.parse("dist/appcast.xml")'
+          echo "feed XML is well formed"
 
           work="$(mktemp -d)"
           cd "$work"
