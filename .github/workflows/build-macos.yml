@@ -191,24 +191,28 @@ jobs:
           name: AvroKeyboard-macOS
           path: dist
 
-      - name: Verify tag matches Info.plist version
+      # PlistBuddy is macOS-only and this job runs on Linux, so the version is
+      # read with plistlib and published once for the steps below.
+      # PlistBuddy is macOS-only and this job runs on Linux, so the version is
+      # read with plistlib and published once for the steps below.
+      - name: Read and verify version
         run: |
           set -euo pipefail
+          SHORT=$(python3 -c 'import plistlib; print(plistlib.load(open("Info.plist","rb"))["CFBundleShortVersionString"])')
+          BUILD=$(python3 -c 'import plistlib; print(plistlib.load(open("Info.plist","rb"))["CFBundleVersion"])')
           TAG="${GITHUB_REF_NAME#v}"
-          SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
-          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Info.plist)
-          echo "tag=$TAG  CFBundleShortVersionString=$SHORT  CFBundleVersion=$BUILD"
+          echo "tag=v$TAG  CFBundleShortVersionString=$SHORT  CFBundleVersion=$BUILD"
           if [ "$TAG" != "$SHORT" ]; then
             echo "::error::Tag v$TAG does not match CFBundleShortVersionString '$SHORT'."
             echo "Bump Info.plist before tagging, or retag."
             exit 1
           fi
+          echo "SHORT=$SHORT" >> "$GITHUB_ENV"
+          echo "BUILD=$BUILD" >> "$GITHUB_ENV"
 
       - name: Write appcast
         run: |
           set -euo pipefail
-          SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
-          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Info.plist)
           URL="https://github.com/mobashirrahman/iAvro/releases/download/${GITHUB_REF_NAME}/AvroKeyboard-macOS.zip"
 
           ASSET="dist/AvroKeyboard-macOS.zip"
@@ -246,8 +250,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
-          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Info.plist)
           NOTES=$(mktemp)
           git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > "$NOTES"
           if [ ! -s "$NOTES" ]; then
