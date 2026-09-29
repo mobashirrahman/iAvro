@@ -29,7 +29,7 @@
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/mobashirrahman/iAvro/master/appcast.xml</string>
+	<string>https://raw.githubusercontent.com/mobashirrahman/iAvro/appcast/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>KUwnCPJsJQYIeE6sopEU0B42V8fs0vFZNw4aftURezw=</string>
 	<key>NSMainNibFile</key>

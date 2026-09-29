@@ -260,20 +260,41 @@ jobs:
             --notes-file "$NOTES"
           echo "::notice::Release $GITHUB_REF_NAME published"
 
-      - name: Publish appcast to the feed branch
-        if: always() && hashFiles('appcast.xml') != ''
+      # The feed is a generated artifact, not history, so it lives on its own
+      # branch: releasing then never rewrites master and never races with a
+      # push to it. The previous version of this step looked for appcast.xml at
+      # the repository root while the artifact lands in dist/, so its `if:`
+      # was always false and the feed was never published at all.
+      - name: Publish the update feed
+        if: hashFiles('dist/appcast.xml') != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # SUFeedURL reads appcast.xml from master on raw.githubusercontent.com.
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          xmllint --noout dist/appcast.xml
+
+          work="$(mktemp -d)"
+          cd "$work"
+          git init -q -b appcast
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          cp "$GITHUB_WORKSPACE/dist/appcast.xml" appcast.xml
           git add appcast.xml
-          if git diff --cached --quiet; then
-            echo "appcast.xml unchanged"
-            exit 0
-          fi
-          git commit -m "Update appcast for $GITHUB_REF_NAME"
-          git push origin "HEAD:master"
-          echo "::notice::appcast.xml published to master"
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Update appcast for $GITHUB_REF_NAME"
+          git push -q --force origin appcast
+
+          # Fetch the exact URL the app uses, so a feed that is not actually
+          # reachable fails the release instead of failing silently later.
+          FEED_URL=$(python3 -c 'import plistlib; print(plistlib.load(open("'"$GITHUB_WORKSPACE"'/Info.plist","rb"))["SUFeedURL"])')
+          for attempt in 1 2 3 4 5; do
+            if curl -sSfL "$FEED_URL" | grep -q "<rss"; then
+              echo "::notice::feed is live at $FEED_URL"
+              exit 0
+            fi
+            echo "attempt $attempt: feed not readable yet, retrying"
+            sleep 10
+          done
+          echo "::error::$FEED_URL did not serve the feed."
+          echo "Check that the appcast branch exists and SUFeedURL matches it."
+          exit 1
