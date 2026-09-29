@@ -11,11 +11,13 @@
     NSMutableDictionary* _weightCache;
     NSMutableDictionary* _phoneticCache;
     NSMutableDictionary* _recentBaseCache;
+    NSMutableDictionary* _countCache;
 }
 
 + (CacheManager *)sharedInstance;
 
 - (void)persist;
+- (void)schedulePersist;
 
 // TODO - Rewrite the CacheManager with meaningful methods
 
@@ -24,13 +26,27 @@
 - (void)removeStringForKey:(NSString*)aKey;
 - (void)setString:(NSString*)aString forKey:(NSString*)aKey;
 
+// Selection Counts (how often a term has been committed)
+- (NSUInteger)countForKey:(NSString*)aKey;
+- (void)incrementCountForKey:(NSString*)aKey;
+- (void)forgetCountsForKey:(NSString*)aKey;
+
+// Snapshot for export, and a merge for import. Merging adds to the existing
+// count rather than replacing it, so importing a backup on a machine that
+// already has learning does not wipe it.
+- (NSDictionary*)countSnapshot;
+- (void)addCounts:(NSDictionary*)counts;
+
 // Phonetic Cahce (default for Array)
 - (NSArray*)arrayForKey:(NSString*)aKey;
 - (void)setArray:(NSArray*)anArray forKey:(NSString*)aKey;
+- (NSUInteger)phoneticCacheCount;
+- (void)removeAllArrays;
 
 // Base Cahce
 - (void)removeAllBase;
 - (NSArray*)baseForKey:(NSString*)aKey;
 - (void)setBase:(NSArray*)aBase forKey:(NSString*)aKey;
+- (NSUInteger)recentBaseCacheCount;
 
 @end

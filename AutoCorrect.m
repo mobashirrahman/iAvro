@@ -7,127 +7,234 @@
 
 #import "AutoCorrect.h"
 #import "AvroParser.h"
+#import "CacheManager.h"
 
-static AutoCorrect *sharedInstance = nil;
+static AutoCorrect* sharedInstance = nil;
 
 @implementation AutoCorrect
 
 @synthesize autoCorrectEntries = _autoCorrectEntries;
-@synthesize userAutoCorrectEntries = _userAutoCorrectEntries;
 
-+ (AutoCorrect *)sharedInstance {
-  if (sharedInstance == nil) {
-    [[self alloc] init]; // assignment not done here, see allocWithZone
-  }
-  return sharedInstance;
++ (AutoCorrect *)sharedInstance  {
+    if (sharedInstance == nil) {
+        [[self alloc] init]; // assignment not done here, see allocWithZone
+    }
+	return sharedInstance;
 }
 
 + (id)allocWithZone:(NSZone *)zone {
-  if (sharedInstance == nil) {
-    sharedInstance = [super allocWithZone:zone];
-    return sharedInstance; // assignment and return on first allocation
-  }
-  return sharedInstance; // on subsequent allocation attempts return nil
+    if (sharedInstance == nil) {
+        sharedInstance = [super allocWithZone:zone];
+        return sharedInstance;  // assignment and return on first allocation
+    }
+    return sharedInstance; //on subsequent allocation attempts return nil
 }
 
 - (id)copyWithZone:(NSZone *)zone {
-  return self;
+    return self;
 }
 
 - (id)retain {
-  return self;
+    return self;
 }
 
 - (oneway void)release {
-  // do nothing
+    //do nothing
 }
 
 - (id)autorelease {
-  return self;
+    return self;
 }
 
 - (NSUInteger)retainCount {
-  return NSUIntegerMax; // This is sooo not zero
+    return NSUIntegerMax;  // This is sooo not zero
+}
+
++ (NSString *)userEntriesPath {
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES);
+    NSString *folder = [[[paths objectAtIndex:0]
+        stringByAppendingPathComponent:@"OmicronLab"]
+        stringByAppendingPathComponent:@"Avro Keyboard"];
+    return [folder stringByAppendingPathComponent:@"autodict-user.plist"];
+}
+
+- (void)persistUserEntries {
+    NSString *path = [[self class] userEntriesPath];
+    [[NSFileManager defaultManager] createDirectoryAtPath:[path stringByDeletingLastPathComponent]
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:NULL];
+    [_userEntries writeToFile:path atomically:YES];
 }
 
 - (id)init {
-  self = [super init];
-  if (self) {
-    // Load bundled AutoCorrect dictionary
-    NSString *fileName = [[NSBundle mainBundle] pathForResource:@"autodict"
-                                                         ofType:@"plist"];
-    if ([[NSFileManager defaultManager] fileExistsAtPath:fileName]) {
-      _autoCorrectEntries =
-          [[NSMutableDictionary alloc] initWithContentsOfFile:fileName];
-    } else {
-      _autoCorrectEntries = [[NSMutableDictionary alloc] init];
-    }
+    self = [super init];
+    if (self) {
+        // Bundled entries (read-only baseline; bundle must stay pristine
+        // for code signature validity).
+        NSString *fileName = [[NSBundle mainBundle] pathForResource:@"autodict" ofType:@"plist"];
+        NSDictionary *bundled = nil;
+        if (fileName && [[NSFileManager defaultManager] fileExistsAtPath:fileName]) {
+            bundled = [NSDictionary dictionaryWithContentsOfFile:fileName];
+        }
+        _bundledEntries = [(bundled ? bundled : [NSDictionary dictionary]) retain];
 
-    // Load user-defined AutoCorrect dictionary
-    NSString *userPath = [[self getUserAutoCorrectPath] retain];
-    if ([[NSFileManager defaultManager] fileExistsAtPath:userPath]) {
-      _userAutoCorrectEntries =
-          [[NSMutableDictionary alloc] initWithContentsOfFile:userPath];
-    } else {
-      _userAutoCorrectEntries = [[NSMutableDictionary alloc] init];
+        // User overlay from Application Support (nil-safe on corrupt file).
+        NSString *userPath = [[self class] userEntriesPath];
+        NSMutableDictionary *user = nil;
+        if ([[NSFileManager defaultManager] fileExistsAtPath:userPath]) {
+            user = [[NSMutableDictionary alloc] initWithContentsOfFile:userPath];
+        }
+        _userEntries = user ? user : [[NSMutableDictionary alloc] initWithCapacity:0];
+
+        // Combined live dictionary (backward compatible with existing readers).
+        _autoCorrectEntries = [[NSMutableDictionary alloc] initWithCapacity:[_bundledEntries count] + [_userEntries count]];
+        [_autoCorrectEntries addEntriesFromDictionary:_bundledEntries];
+        [_autoCorrectEntries addEntriesFromDictionary:_userEntries];
+        // An empty user value hides a bundled entry the user deleted
+        for (NSString *key in _userEntries) {
+            if ([[_userEntries objectForKey:key] length] == 0) {
+                [_autoCorrectEntries removeObjectForKey:key];
+            }
+        }
     }
-    [userPath release];
-  }
-  return self;
+    return self;
 }
 
 - (void)dealloc {
-  [_autoCorrectEntries release];
-  [_userAutoCorrectEntries release];
-  [super dealloc];
+    [_autoCorrectEntries release];
+    [_bundledEntries release];
+    [_userEntries release];
+    [super dealloc];
 }
 
 // Instance Methods
-- (NSString *)find:(NSString *)term {
-  term = [[AvroParser sharedInstance] fix:term];
-  // User entries take priority
-  NSString *userResult = _userAutoCorrectEntries[term];
-  if (userResult) {
-    return userResult;
-  }
-  return _autoCorrectEntries[term];
+- (NSString*)find:(NSString*)term {
+    term = [[AvroParser sharedInstance] fix:term];
+    if (!term) {
+        return nil;
+    }
+    return [_autoCorrectEntries objectForKey:term];
 }
 
-- (NSString *)getUserAutoCorrectPath {
-  NSArray *paths = NSSearchPathForDirectoriesInDomains(
-      NSApplicationSupportDirectory, NSUserDomainMask, YES);
-  NSString *appSupportDir =
-      [[[paths objectAtIndex:0] stringByAppendingPathComponent:@"OmicronLab"]
-          stringByAppendingPathComponent:@"Avro Keyboard"];
-  // Create directory if it doesn't exist
-  NSFileManager *fileManager = [NSFileManager defaultManager];
-  if (![fileManager fileExistsAtPath:appSupportDir]) {
-    NSError *error = nil;
-    [fileManager createDirectoryAtPath:appSupportDir
-           withIntermediateDirectories:YES
-                            attributes:nil
-                                 error:&error];
-  }
-  return [appSupportDir stringByAppendingPathComponent:@"user_autodict.plist"];
+- (void)setUserAutoCorrect:(NSString *)correction forTerm:(NSString *)term {
+    if (!correction || !term || [term length] == 0) {
+        return;
+    }
+    NSString *key = [[AvroParser sharedInstance] fix:term];
+    if (!key || [key length] == 0) {
+        return;
+    }
+    [_userEntries setObject:correction forKey:key];
+    [_autoCorrectEntries setObject:correction forKey:key];
+    [self persistUserEntries];
+    [self entriesDidChange];
 }
 
-- (void)addUserEntry:(NSString *)replace with:(NSString *)with {
-  [_userAutoCorrectEntries setObject:with forKey:replace];
-  [self saveUserEntries];
+- (void)removeUserAutoCorrectForTerm:(NSString *)term {
+    if (!term) {
+        return;
+    }
+    NSString *key = [[AvroParser sharedInstance] fix:term];
+    if (!key) {
+        return;
+    }
+    [_userEntries removeObjectForKey:key];
+    [_autoCorrectEntries removeObjectForKey:key];
+    id bundledValue = [_bundledEntries objectForKey:key];
+    if (bundledValue) {
+        [_autoCorrectEntries setObject:bundledValue forKey:key];
+    }
+    [self persistUserEntries];
+    [self entriesDidChange];
 }
 
-- (void)removeUserEntry:(NSString *)replace {
-  [_userAutoCorrectEntries removeObjectForKey:replace];
-  [self saveUserEntries];
+- (NSDictionary *)userAutoCorrectEntries {
+    return [[_userEntries copy] autorelease];
 }
 
-- (void)saveUserEntries {
-  [_userAutoCorrectEntries writeToFile:[self getUserAutoCorrectPath]
-                            atomically:YES];
+- (void)deleteAutoCorrectForTerm:(NSString *)term {
+    NSString *key = [[AvroParser sharedInstance] fix:term];
+    if (!key || [key length] == 0) {
+        return;
+    }
+    if ([_bundledEntries objectForKey:key]) {
+        // Bundled entries can't be removed from the bundle; mask them.
+        [_userEntries setObject:@"" forKey:key];
+    } else {
+        [_userEntries removeObjectForKey:key];
+    }
+    [_autoCorrectEntries removeObjectForKey:key];
+    [self persistUserEntries];
+    [self entriesDidChange];
 }
 
-- (BOOL)isUserEntry:(NSString *)key {
-  return [_userAutoCorrectEntries objectForKey:key] != nil;
+- (void)setUserAutoCorrectEntries:(NSDictionary *)entries {
+    for (NSString *term in entries) {
+        NSString *key = [[AvroParser sharedInstance] fix:term];
+        NSString *correction = [entries objectForKey:term];
+        if ([key length] == 0 || [correction length] == 0) {
+            continue;
+        }
+        [_userEntries setObject:correction forKey:key];
+        [_autoCorrectEntries setObject:correction forKey:key];
+    }
+    [self persistUserEntries];
+    [self entriesDidChange];
+}
+
+// Suggestion lists are memoized per term and include AutoCorrect results.
+- (void)entriesDidChange {
+    [[CacheManager sharedInstance] removeAllArrays];
+}
+
+// Values are stored as the Bangla they produce. Like Windows Avro, a value
+// typed in Roman phonetic is transliterated; Bangla, symbols and emoticons
+// (value same as the term, e.g. ":-P") are kept as typed.
+- (NSString *)correctionForValue:(NSString *)value term:(NSString *)term {
+    if (!value) {
+        return nil;
+    }
+    NSCharacterSet *latin = [NSCharacterSet characterSetWithCharactersInString:
+        @"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+    BOOL hasBangla = [value rangeOfString:@"[\u0980-\u09FF]"
+                                  options:NSRegularExpressionSearch].location != NSNotFound;
+    if (hasBangla || [value rangeOfCharacterFromSet:latin].location == NSNotFound) {
+        return value;
+    }
+    BOOL phoneticWord = [term rangeOfString:@"^"].location != NSNotFound ||
+        [term rangeOfString:@"^[A-Za-z]{2,}:$" options:NSRegularExpressionSearch].location != NSNotFound;
+    if (term && !phoneticWord && [value caseInsensitiveCompare:term] == NSOrderedSame &&
+        [term rangeOfString:@"[A-Za-z]{3,}" options:NSRegularExpressionSearch].location == NSNotFound &&
+        [term rangeOfString:@"[^A-Za-z]" options:NSRegularExpressionSearch].location != NSNotFound) {
+        return value;
+    }
+    return [[AvroParser sharedInstance] parse:value];
+}
+
+// Windows Avro .dct format: "term value" per line, "//" lines are comments.
++ (NSDictionary *)entriesFromDictionaryFile:(NSString *)path error:(NSError **)error {
+    NSString *contents = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:error];
+    if (!contents) {
+        return nil;
+    }
+    NSMutableDictionary *entries = [NSMutableDictionary dictionary];
+    for (NSString *rawLine in [contents componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]]) {
+        NSString *line = [rawLine stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+        if ([line length] == 0 || [line hasPrefix:@"/"]) {
+            continue;
+        }
+        NSRange space = [line rangeOfCharacterFromSet:[NSCharacterSet whitespaceCharacterSet]];
+        if (space.location == NSNotFound) {
+            continue;
+        }
+        NSString *value = [[line substringFromIndex:NSMaxRange(space)]
+            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+        if ([value length] > 0) {
+            [entries setObject:value forKey:[line substringToIndex:space.location]];
+        }
+    }
+    return entries;
 }
 
 @end

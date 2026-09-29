@@ -6,6 +6,7 @@
 //
 
 #import "AvroParser.h"
+#import "SettingsKeys.h"
 
 static AvroParser* sharedInstance = nil;
 
@@ -67,6 +68,17 @@ static AvroParser* sharedInstance = nil;
                 _casesensitive = [[NSString alloc] initWithString:[jsonArray objectForKey:@"casesensitive"]];
                 _patterns = [[NSArray alloc] initWithArray:[jsonArray objectForKey:@"patterns"]];
                 _maxPatternLength = [[[_patterns objectAtIndex:0] objectForKey:@"find"] length];
+                // Order-independent lookup: the table is not in valid
+                // binary-search order, so build a hash index (last duplicate
+                // wins, matching previous observable behavior).
+                NSMutableDictionary *patternDict = [[NSMutableDictionary alloc] initWithCapacity:[_patterns count]];
+                for (NSDictionary *entry in _patterns) {
+                    NSString *key = [entry objectForKey:@"find"];
+                    if (key) {
+                        [patternDict setObject:entry forKey:key];
+                    }
+                }
+                _patternDict = patternDict;
             }
 
         } else {
@@ -81,6 +93,7 @@ static AvroParser* sharedInstance = nil;
     [_consonant release];
     [_casesensitive release];
     [_patterns release];
+    [_patternDict release];
 
     [super dealloc];
 }
@@ -92,6 +105,8 @@ static AvroParser* sharedInstance = nil;
 
     NSString * fixed = [self fix:string];
     NSMutableString* output = [[NSMutableString alloc] initWithCapacity:0];
+    // Windows Avro option: Shift-J types জ় (jo + nukta) instead of জ
+    BOOL joNukta = [[NSUserDefaults standardUserDefaults] boolForKey:kJoNuktaDefaultsKey];
 
     NSInteger len = [fixed length], cur;
     for(cur = 0; cur < len; ++cur) {
@@ -104,13 +119,17 @@ static AvroParser* sharedInstance = nil;
             if(end <= len) {
                 NSString* chunk = [fixed substringWithRange:NSMakeRange(start, chunkLen)];
 
-                // Binary Search
-                NSInteger left = 0, right = [_patterns count] - 1, mid;
-                while(right >= left) {
-                    mid = (right + left) / 2;
-                    NSDictionary* pattern = [_patterns objectAtIndex:mid];
-                    NSString* find = [pattern objectForKey:@"find"];
-                    if([find isEqualToString:chunk]) {
+                // Order-independent hash lookup. The table is not in valid
+                // binary-search order (e.g. TT before TH), so binary search
+                // silently missed patterns like TH, H and qq.
+                if (joNukta && [chunk isEqualToString:@"J"]) {
+                    [output appendString:@"\u099C\u09BC"];
+                    cur = end - 1;
+                    matched = TRUE;
+                    break;
+                }
+                NSDictionary* pattern = [_patternDict objectForKey:chunk];
+                if (pattern) {
                         NSArray* rules = [pattern objectForKey:@"rules"];
                         for(NSDictionary* rule in rules) {
 
@@ -223,14 +242,6 @@ static AvroParser* sharedInstance = nil;
                         [output appendString:[pattern objectForKey:@"replace"]];
                         cur = end - 1;
                         matched = TRUE;
-                        break;
-                    }
-                    else if ([find length] > [chunk length] ||
-                             ([find length] == [chunk length] && [find compare:chunk] == NSOrderedAscending)) {
-                        left = mid + 1;
-                    } else {
-                        right = mid - 1;
-                    }
                 }
                 if(matched == TRUE) break;
             }
@@ -285,7 +296,10 @@ static AvroParser* sharedInstance = nil;
 - (BOOL)isExact:(NSString*) needle heystack:(NSString*)heystack start:(int)start end:(int)end not:(BOOL)not {
     // NSLog(@"Cut: %@", [heystack substringWithRange:NSMakeRange(start, end)]);
     int len = end - start;
-    return ((start >= 0 && end < [heystack length]
+    if (len < 0) {
+        return (NO ^ not);
+    }
+    return ((start >= 0 && end <= (int)[heystack length]
              && [[heystack substringWithRange:NSMakeRange(start, len)] isEqualToString:needle]) ^ not);
 }
 

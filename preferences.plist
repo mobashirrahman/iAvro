@@ -6,9 +6,25 @@
 	<integer>1</integer>
 	<key>CommitNewLineOnEnter</key>
 	<false/>
+	<key>PipeToDot</key>
+	<false/>
+	<key>EnableJoNukta</key>
+	<false/>
+	<key>TabBrowsing</key>
+	<false/>
+	<key>ClassicPhonetic</key>
+	<false/>
+	<key>PreferTransliteration</key>
+	<false/>
+	<key>OfferEnglishSuggestion</key>
+	<true/>
 	<key>IncludeDictionary</key>
 	<true/>
 	<key>ShowInlineBangla</key>
+	<true/>
+	<key>EnableAutoCorrect</key>
+	<true/>
+	<key>EnableSuggestions</key>
 	<true/>
 </dict>
 </plist>

@@ -17,4 +17,8 @@
 - (NSArray*)find:(NSString*)term;
 - (NSString*)banglaForSuffix:(NSString*)suffix;
 
+// Exposed so coverage can be measured: which tables hold which words.
+- (NSArray*)wordsInTable:(NSString*)table;
+- (NSArray*)tableNames;
+
 @end

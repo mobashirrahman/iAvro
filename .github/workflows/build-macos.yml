@@ -6,13 +6,38 @@ on:
     branches:
       - main
       - master
+      - fix/bug-series
+    tags:
+      - "v*"
+  pull_request:
+
+env:
+  # Xcode 26.2 is the newest build that ships the macOS 26.2 SDK, which is the
+  # SDK the app is developed against. Override to test other toolchains.
+  XCODE_VERSION: "26.2"
 
 jobs:
   build:
-    runs-on: macos-15
+    # macos-26 is Apple Silicon and carries the full Xcode 26.x line
+    # (26.0.1 - 26.6). macos-15 only ships up to 26.0.
+    runs-on: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          XCODE_PATH="/Applications/Xcode_${XCODE_VERSION}.app"
+          if [ ! -d "$XCODE_PATH" ]; then
+            echo "::error::Xcode ${XCODE_VERSION} not installed on this image"
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_PATH"
+          echo "DEVELOPER_DIR=$XCODE_PATH" >> "$GITHUB_ENV"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i macos
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -25,7 +50,13 @@ jobs:
       - name: Install Pods
         run: pod install
 
-      - name: Build
+      - name: Run regression tests
+        run: Tests/run_tests.sh
+
+      - name: Check generated word list is in sync
+        run: python3 tools/build_extra_words.py --check
+
+      - name: Build (universal)
         run: |
           set -euo pipefail
           xcodebuild \
@@ -34,23 +65,214 @@ jobs:
             -configuration Release \
             -sdk macosx \
             -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            ARCHS="x86_64 arm64" \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=""
+
+      - name: Verify universal binary
+        run: |
+          set -euo pipefail
+          BIN="build/Build/Products/Release/Avro Keyboard.app/Contents/MacOS/Avro Keyboard"
+          if [ ! -f "$BIN" ]; then
+            echo "Binary not found at $BIN"
+            find build -maxdepth 5 -name "*.app"
+            exit 1
+          fi
+          echo "--- architectures ---"
+          lipo -info "$BIN"
+          lipo -info "$BIN" | grep -q "x86_64" || { echo "FAIL: missing x86_64 slice"; exit 1; }
+          lipo -info "$BIN" | grep -q "arm64"  || { echo "FAIL: missing arm64 slice"; exit 1; }
+          echo "OK: universal x86_64 + arm64"
+          echo "--- minimum OS per slice ---"
+          for arch in x86_64 arm64; do
+            printf '%-8s ' "$arch"
+            otool -arch "$arch" -l "$BIN" \
+              | grep -A4 -E "LC_VERSION_MIN_MACOSX|LC_BUILD_VERSION" \
+              | grep -E "minos|sdk" | tr '\n' ' '
+            echo
+          done
+
+      - name: Verify hardened runtime
+        run: |
+          set -euo pipefail
+          BIN="build/Build/Products/Release/Avro Keyboard.app/Contents/MacOS/Avro Keyboard"
+          FLAGS=$(codesign -d --verbose=2 "$BIN" 2>&1 || true)
+          echo "$FLAGS"
+          if echo "$FLAGS" | grep -q "flags=.*runtime"; then
+            echo "OK: hardened runtime enabled"
+          else
+            echo "FAIL: hardened runtime missing (notarization will be rejected)"
+            exit 1
+          fi
+
+      - name: Verify Info.plist
+        run: |
+          set -euo pipefail
+          APP="build/Build/Products/Release/Avro Keyboard.app"
+          plutil -lint "$APP/Contents/Info.plist"
+          NAME=$(/usr/libexec/PlistBuddy -c "Print :CFBundleName" "$APP/Contents/Info.plist")
+          echo "CFBundleName=$NAME"
+          [ "$NAME" = "Avro Keyboard" ] || { echo "FAIL: unexpected CFBundleName"; exit 1; }
+          /usr/libexec/PlistBuddy -c "Print :InputMethodServerControllerClass" \
+            "$APP/Contents/Info.plist" >/dev/null
+          echo "OK: Info.plist sane"
 
       - name: Package App
         run: |
           set -euo pipefail
           APP_PATH="build/Build/Products/Release/Avro Keyboard.app"
-          if [ ! -d "$APP_PATH" ]; then
-            echo "App not found at $APP_PATH"
-            find build -maxdepth 5 -name "*.app"
-            exit 1
-          fi
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "AvroKeyboard-macOS.zip"
+
+      # Runs here rather than in the release job because sign_update is a macOS
+      # binary and the pod that ships it is only present after pod install.
+      # Skipped when the secret is absent so forks still build; Sparkle will
+      # reject an unsigned archive, so the feed is only written when signed.
+      - name: Sign update archive with Sparkle EdDSA
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          ZIP="AvroKeyboard-macOS.zip"
+          if [ -z "${SPARKLE_PRIVATE_KEY:-}" ]; then
+            echo "::notice::SPARKLE_PRIVATE_KEY not set - releasing unsigned archive"
+            exit 0
+          fi
+          TOOL="Pods/Sparkle/bin/sign_update"
+          [ -x "$TOOL" ] || { echo "::error::$TOOL missing"; exit 1; }
+          # The key is passed on stdin with "--ed-key-file -". Passing it as an
+          # argument is no longer supported for keys generated by the current
+          # Sparkle, and writing it to a file leaves it on disk.
+          # Output is: sparkle:edSignature="..." length="..."
+          echo "$SPARKLE_PRIVATE_KEY" \
+            | "$TOOL" --ed-key-file - "$ZIP" > signature.txt
+          grep -q 'sparkle:edSignature=' signature.txt \
+            || { echo "::error::sign_update produced no signature"; cat signature.txt; exit 1; }
+          # Keep only the signature attribute: the appcast writes its own
+          # length, and duplicating it would emit two length attributes.
+          sed -n 's/.*\(sparkle:edSignature="[^"]*"\).*/\1/p' signature.txt \
+            > eddsa-signature.txt
+          [ -s eddsa-signature.txt ] \
+            || { echo "::error::could not extract edSignature"; exit 1; }
+          # sign_update only computes a signature, it does not modify the
+          # archive, so the zip keeps its name. The appcast points at that
+          # name, so it must stay stable whether or not signing ran.
+          cat eddsa-signature.txt
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: AvroKeyboard-macOS
-          path: AvroKeyboard-macOS.zip
+          path: |
+            AvroKeyboard-macOS.zip
+            eddsa-signature.txt
+          if-no-files-found: warn
+
+  # Tag-driven release. Uses no Apple credentials: the app is distributed
+  # ad-hoc signed, and users approve it once via right-click -> Open. See the
+  # install section in README.md.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: AvroKeyboard-macOS
+          path: dist
+
+      - name: Verify tag matches Info.plist version
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
+          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Info.plist)
+          echo "tag=$TAG  CFBundleShortVersionString=$SHORT  CFBundleVersion=$BUILD"
+          if [ "$TAG" != "$SHORT" ]; then
+            echo "::error::Tag v$TAG does not match CFBundleShortVersionString '$SHORT'."
+            echo "Bump Info.plist before tagging, or retag."
+            exit 1
+          fi
+
+      - name: Write appcast
+        run: |
+          set -euo pipefail
+          SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
+          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Info.plist)
+          URL="https://github.com/mobashirrahman/iAvro/releases/download/${GITHUB_REF_NAME}/AvroKeyboard-macOS.zip"
+
+          ASSET="dist/AvroKeyboard-macOS.zip"
+
+          if [ ! -f dist/eddsa-signature.txt ]; then
+            echo "::notice::No EdDSA signature - skipping appcast (auto-update needs a signed archive)"
+            exit 0
+          fi
+
+          ED=$(cat dist/eddsa-signature.txt)
+          LENGTH=$(wc -c < "$ASSET" | tr -d ' ')
+          PUB_DATE=$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')
+          {
+            printf '<?xml version="1.0" encoding="utf-8"?>\n'
+            printf '<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">\n'
+            printf '  <channel>\n'
+            printf '    <title>Avro Keyboard</title>\n'
+            printf '    <link>https://github.com/mobashirrahman/iAvro</link>\n'
+            printf '    <description>Updates for Avro Keyboard.</description>\n'
+            printf '    <item>\n'
+            printf '      <title>Version %s</title>\n' "$SHORT"
+            printf '      <pubDate>%s</pubDate>\n' "$PUB_DATE"
+            printf '      <sparkle:releaseNotesLink>https://github.com/mobashirrahman/iAvro/releases/tag/%s</sparkle:releaseNotesLink>\n' "$GITHUB_REF_NAME"
+            printf '      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>\n'
+            printf '      <enclosure url="%s" length="%s" type="application/octet-stream" %s />\n' "$URL" "$LENGTH" "$ED"
+            printf '    </item>\n'
+            printf '  </channel>\n'
+            printf '</rss>\n'
+          } > appcast.xml
+          xmllint --noout appcast.xml
+          echo "appcast.xml written: version=$SHORT length=$LENGTH"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Info.plist)
+          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Info.plist)
+          NOTES=$(mktemp)
+          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > "$NOTES"
+          if [ ! -s "$NOTES" ]; then
+            printf 'Avro Keyboard %s (build %s)\n\nUniversal build for Apple Silicon and Intel Macs.\n' \
+              "$SHORT" "$BUILD" > "$NOTES"
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/AvroKeyboard-macOS.zip \
+            --title "Avro Keyboard $SHORT" \
+            --notes-file "$NOTES"
+          echo "::notice::Release $GITHUB_REF_NAME published"
+
+      - name: Publish appcast to the feed branch
+        if: always() && hashFiles('appcast.xml') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # SUFeedURL reads appcast.xml from master on raw.githubusercontent.com.
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          if git diff --cached --quiet; then
+            echo "appcast.xml unchanged"
+            exit 0
+          fi
+          git commit -m "Update appcast for $GITHUB_REF_NAME"
+          git push origin "HEAD:master"
+          echo "::notice::appcast.xml published to master"

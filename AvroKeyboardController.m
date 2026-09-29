@@ -13,11 +13,18 @@
 #import "RegexKitLite.h"
 #import "AvroParser.h"
 #import "AutoCorrect.h"
-
-static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
+#import "SettingsKeys.h"
 
 @interface AvroKeyboardController ()
 - (NSString *)compositionDisplayString;
+- (NSString *)stringFromCandidate:(id)candidate;
+- (void)recordCommitOfCandidate:(NSString *)candidateText;
+- (void)addEnglishCandidateRemembering:(NSString *)prevString;
+- (NSInteger)preferredTransliterationIndex;
+- (BOOL)isClassicMode;
+- (NSString *)classicOutput;
+- (BOOL)browseCandidatesBy:(NSInteger)step;
+- (NSString *)englishCandidate;
 @end
 
 @implementation AvroKeyboardController
@@ -33,6 +40,7 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
         _composedBuffer = [[NSMutableString alloc] initWithString:@""];
         _currentCandidates = [[NSMutableArray alloc] initWithCapacity:0];
         _prevSelected = -1;
+        _selectedCandidateIndex = 0;
         _usedArrowKeys = false;
     }
 
@@ -50,7 +58,10 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
 }
 
 - (void)findCurrentCandidates {
-    [_currentCandidates removeAllObjects];
+    [_currentCandidates release];
+    _currentCandidates = [[NSMutableArray alloc] initWithCapacity:0];
+    _prevSelected = -1;
+    _selectedCandidateIndex = 0;
     if (_composedBuffer && [_composedBuffer length] > 0) {
         NSString* regex = @"(^(?::`|\\.`|[-\\]\\\\~!@#&*()_=+\\[{}'\";<>/?|.,])*?(?=(?:,{2,}))|^(?::`|\\.`|[-\\]\\\\~!@#&*()_=+\\[{}'\";<>/?|.,])*)(.*?(?:,,)*)((?::`|\\.`|[-\\]\\\\~!@#&*()_=+\\[{}'\";<>/?|.,])*$)";
         NSArray* items = [_composedBuffer captureComponentsMatchedByRegex:regex];
@@ -59,8 +70,15 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
             [self setPrefix:[[AvroParser sharedInstance] parse:[items objectAtIndex:1]]];
             [self setTerm:[items objectAtIndex:2]];
             [self setSuffix:[[AvroParser sharedInstance] parse:[items objectAtIndex:3]]];
-            
-            _currentCandidates = [[[Suggestion sharedInstance] getList:[self term]] retain];
+
+            if ([self isClassicMode]) {
+                [_currentCandidates addObject:[self classicOutput]];
+                return;
+            }
+
+            NSArray *freshList = [[Suggestion sharedInstance] getList:[self term]];
+            [_currentCandidates release];
+            _currentCandidates = [freshList mutableCopy];
             if (_currentCandidates && [_currentCandidates count] > 0) {
                 NSString* prevString = nil;
                 if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
@@ -70,30 +88,126 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
                 int i;
                 for (i = 0; i < [_currentCandidates count]; ++i) {
                     NSString* item = [_currentCandidates objectAtIndex:i];
-                    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"] && 
-                        _prevSelected && [item isEqualToString:prevString] ) {
+                    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"] &&
+                        _prevSelected == -1 && prevString && [item isEqualToString:prevString] ) {
                         _prevSelected = i;
                     }
                     [_currentCandidates replaceObjectAtIndex:i withObject:
                      [NSString stringWithFormat:@"%@%@%@", [self prefix], item, [self suffix]]];
                 }
-                // Emoticons                
-                if ([_composedBuffer isEqualToString:[self term]] == NO && 
+                // Emoticons
+                if ([_composedBuffer isEqualToString:[self term]] == NO &&
                     [[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
                     NSString* smily = [[AutoCorrect sharedInstance] find:_composedBuffer];
                     if (smily) {
+                        // The term's own AutoCorrect entry can already yield it
+                        // (":" + ")"), so move it to the front instead of adding twice.
+                        NSUInteger existing = [_currentCandidates indexOfObject:smily];
+                        BOOL wasSelected = (existing != NSNotFound && _prevSelected == (int)existing);
+                        if (existing != NSNotFound) {
+                            [_currentCandidates removeObjectAtIndex:existing];
+                            if (_prevSelected > (int)existing) {
+                                _prevSelected -= 1;
+                            }
+                        }
                         [_currentCandidates insertObject:smily atIndex:0];
+                        if (wasSelected) {
+                            _prevSelected = 0;
+                        } else if (_prevSelected >= 0) {
+                            _prevSelected += 1;
+                        }
                     }
+                }
+                [self addEnglishCandidateRemembering:prevString];
+                if (_prevSelected == -1) {
+                    _prevSelected = (int)[self preferredTransliterationIndex];
+                }
+                if (_prevSelected >= 0 && _prevSelected < [_currentCandidates count]) {
+                    _selectedCandidateIndex = _prevSelected;
+                } else {
+                    _selectedCandidateIndex = 0;
                 }
             }
             else {
                 [_currentCandidates addObject:[self prefix]];
+                [self addEnglishCandidateRemembering:nil];
             }
         }
     }
 }
 
+// The buffer as English text: Avro's literal-dot syntax (".`", also what
+// Shift-\\ types) reads as a plain dot.
+- (NSString *)englishCandidate {
+    // Copy: with nothing to replace this can return the mutable buffer itself
+    return [[[_composedBuffer stringByReplacingOccurrencesOfString:@".`" withString:@"."] copy] autorelease];
+}
+
+// Windows Avro offers the typed Roman text as the last choice, so English
+// words can be typed without switching input sources. Choosing it is
+// remembered like any other candidate: the weight cache stores the raw term.
+- (void)addEnglishCandidateRemembering:(NSString *)prevString {
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:kOfferEnglishDefaultsKey]) {
+        return;
+    }
+    NSString *english = [self englishCandidate];
+    if ([_currentCandidates containsObject:english]) {
+        return;
+    }
+    [_currentCandidates addObject:english];
+    if (_prevSelected == -1 && prevString && [prevString isEqualToString:[self term]]) {
+        _prevSelected = (int)[_currentCandidates count] - 1;
+    }
+}
+
+// Windows Avro's "character mode": with no remembered choice and no
+// AutoCorrect hit, preselect the exact transliteration instead of the
+// top dictionary word. Returns -1 to keep the default (first) candidate.
+- (NSInteger)preferredTransliterationIndex {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    if (![defaults boolForKey:kPreferTransliterationDefaultsKey] ||
+        ![defaults boolForKey:@"IncludeDictionary"] || [[self term] length] < 2) {
+        return -1;
+    }
+    if ([defaults boolForKey:kEnableAutoCorrectDefaultsKey] &&
+        [[AutoCorrect sharedInstance] find:[self term]]) {
+        return -1;
+    }
+    NSString *exact = [NSString stringWithFormat:@"%@%@%@", [self prefix],
+                       [[AvroParser sharedInstance] parse:[self term]], [self suffix]];
+    NSUInteger index = [_currentCandidates indexOfObject:exact];
+    return index == NSNotFound ? -1 : (NSInteger)index;
+}
+
+- (BOOL)isClassicMode {
+    return [[NSUserDefaults standardUserDefaults] boolForKey:kClassicPhoneticDefaultsKey];
+}
+
+// Windows Avro's classic phonetic: no window, no dictionary. The output is
+// the AutoCorrect entry when there is one, else the plain transliteration.
+- (NSString *)classicOutput {
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:kEnableAutoCorrectDefaultsKey]) {
+        // Whole-buffer entries first, like the emoticon lookup (":-)")
+        if (![_composedBuffer isEqualToString:[self term]]) {
+            NSString *whole = [[AutoCorrect sharedInstance] find:_composedBuffer];
+            if (whole) {
+                return whole;
+            }
+        }
+        NSString *corrected = [[AutoCorrect sharedInstance] find:[self term]];
+        if (corrected) {
+            return [NSString stringWithFormat:@"%@%@%@", [self prefix], corrected, [self suffix]];
+        }
+    }
+    return [NSString stringWithFormat:@"%@%@%@", [self prefix],
+            [[AvroParser sharedInstance] parse:[self term]], [self suffix]];
+}
+
 - (void)updateCandidatesPanel {
+    if ([self isClassicMode]) {
+        [[Candidates sharedInstance] hide];
+        return;
+    }
     if (_currentCandidates && [_currentCandidates count] > 0) {
         NSUserDefaults *defaultsDictionary = [NSUserDefaults standardUserDefaults];
         
@@ -121,43 +235,105 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
     }
 }
 
-- (NSArray*)candidates:(id)sender {
-	return _currentCandidates;	
+- (NSString *)stringFromCandidate:(id)candidate {
+    if (!candidate) {
+        return nil;
+    }
+    if ([candidate isKindOfClass:[NSAttributedString class]]) {
+        return [(NSAttributedString *)candidate string];
+    }
+    if ([candidate isKindOfClass:[NSString class]]) {
+        return (NSString *)candidate;
+    }
+    return nil;
 }
 
-- (void)candidateSelectionChanged:(NSAttributedString*)candidateString {
+- (NSArray*)candidates:(id)sender {
+	return [[_currentCandidates copy] autorelease];
+}
+
+- (void)candidateSelectionChanged:(id)candidate {
+    NSString *candidateText = [self stringFromCandidate:candidate];
+    if (!candidateText) {
+        return;
+    }
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
-        if ([self term] && [[self term] length] > 0) {
-            BOOL comp = [[candidateString string] isEqualToString:[_currentCandidates objectAtIndex:0]];
+        if ([self term] && [[self term] length] > 0 && [_currentCandidates count] > 0) {
+            NSString *firstCandidate = [_currentCandidates objectAtIndex:0];
+            if (![firstCandidate isKindOfClass:[NSString class]]) {
+                firstCandidate = [self stringFromCandidate:firstCandidate];
+            }
+            BOOL comp = [candidateText isEqualToString:firstCandidate];
             if ((comp && _prevSelected == -1) == NO) {
-                NSRange range = NSMakeRange([[self prefix] length], 
-                                            [candidateString length] - ([[self prefix] length] + [[self suffix] length]));
-                [[CacheManager sharedInstance] setString:[[candidateString string] substringWithRange:range] forKey:[self term]];
-                
+                NSUInteger prefixLen = [[self prefix] length];
+                NSUInteger suffixLen = [[self suffix] length];
+                if ([candidateText isEqualToString:[self englishCandidate]]) {
+                    // English candidate: its prefix/suffix are Roman, not the
+                    // parsed lengths above, so remember the raw term itself.
+                    [[CacheManager sharedInstance] setString:[self term] forKey:[self term]];
+                }
+                else if (prefixLen + suffixLen <= [candidateText length]) {
+                    NSRange range = NSMakeRange(prefixLen,
+                                                [candidateText length] - (prefixLen + suffixLen));
+                    [[CacheManager sharedInstance] setString:[candidateText substringWithRange:range] forKey:[self term]];
+                }
+
                 // Reverse Suffix Caching
-                NSArray* tmpArray = [[CacheManager sharedInstance] baseForKey:[candidateString string]];
+                NSArray* tmpArray = [[CacheManager sharedInstance] baseForKey:candidateText];
                 if (tmpArray && [tmpArray count] > 0) {
                     [[CacheManager sharedInstance] setString:[tmpArray objectAtIndex:1] forKey:[tmpArray objectAtIndex:0]];
                 }
             }
         }
     }
-    _selectedCandidateIndex = [_currentCandidates indexOfObject:candidateString.string];
+    NSUInteger found = [_currentCandidates indexOfObject:candidateText];
+    if (found != NSNotFound) {
+        _selectedCandidateIndex = found;
+    }
 }
 
-- (void)candidateSelected:(NSAttributedString*)candidateString {
-    [_currentClient insertText:candidateString replacementRange:NSMakeRange(NSNotFound, 0)];
-	
+- (void)candidateSelected:(id)candidate {
+    NSString *candidateText = [self stringFromCandidate:candidate];
+    if (!candidateText) {
+        return;
+    }
+    [_currentClient insertText:candidateText replacementRange:NSMakeRange(NSNotFound, 0)];
+
 	[self clearCompositionBuffer];
 	[_currentCandidates removeAllObjects];
     [self updateCandidatesPanel];
-    
-    if (_usedArrowKeys) {
-        _usedArrowKeys = false;
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
-            [[CacheManager sharedInstance] persist];
-        }
+
+    _usedArrowKeys = false;
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
+        [self recordCommitOfCandidate:candidateText];
+        [[CacheManager sharedInstance] schedulePersist];
     }
+}
+
+// Counts a word only once it has actually been committed. Doing this in
+// candidateSelectionChanged: instead would count every candidate the user
+// merely arrowed past, which would flood the personal frequency with words
+// they never chose.
+- (void)recordCommitOfCandidate:(NSString *)candidateText {
+    if (![candidateText isEqualToString:[self englishCandidate]]) {
+        NSUInteger prefixLen = [[self prefix] length];
+        NSUInteger suffixLen = [[self suffix] length];
+        if (prefixLen + suffixLen > [candidateText length]) {
+            return;
+        }
+        NSRange range = NSMakeRange(prefixLen,
+                                    [candidateText length] - (prefixLen + suffixLen));
+        [[CacheManager sharedInstance] incrementCountForKey:
+            [candidateText substringWithRange:range]];
+    }
+}
+
+- (void)deactivateServer:(id)sender {
+    // Flush any pending debounced save when the user switches away
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
+        [[CacheManager sharedInstance] persist];
+    }
+    [super deactivateServer:sender];
 }
 
 - (void)commitComposition:(id)sender {
@@ -179,6 +355,10 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
 }
 
 - (NSString *)compositionDisplayString {
+    // Classic mode has no window, so the Bangla must show inline
+    if ([self isClassicMode] && [_currentCandidates count] > 0) {
+        return [_currentCandidates objectAtIndex:0];
+    }
     if (![[NSUserDefaults standardUserDefaults] boolForKey:kShowInlineBanglaDefaultsKey]) {
         return _composedBuffer ? _composedBuffer : @"";
     }
@@ -224,15 +404,24 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
     // other words the system will not deliver a key down event to the application.
     // Returning NO means the original key down will be passed on to the client.
     if ([string isEqualToString:@" "]) {
-        if (_currentCandidates && [_currentCandidates count]) {
+        if (_currentCandidates && [_currentCandidates count] > 0) {
             // IMKCandidates:selectedCandidateString returns null for some reason, so null is commited when user presses enter.
             // Temporary fix for macOS sierra, use our own _selectedCandidateIndex instead.
             // TODO: Figure out why IMKCandidates:selectedCandidateString isn't working.
-            [self candidateSelected:_currentCandidates[_selectedCandidateIndex]];
+            NSUInteger safeIndex = _selectedCandidateIndex;
+            if (safeIndex >= [_currentCandidates count]) {
+                safeIndex = 0;
+            }
+            [self candidateSelected:[_currentCandidates objectAtIndex:safeIndex]];
         }
         return NO;
     }
     else {
+        if ([string isEqualToString:@"|"] &&
+            [[NSUserDefaults standardUserDefaults] boolForKey:kPipeToDotDefaultsKey]) {
+            // Windows Avro option: Avro's literal-dot syntax, since "." alone is দাঁড়ি
+            string = @".`";
+        }
         [_composedBuffer appendString:string];
         [self findCurrentCandidates];
         [self updateComposition];
@@ -242,7 +431,10 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
 }
 
 - (void)deleteBackward:(id)sender {
-    // We're called only when [compositionBuffer length] > 0
+    // We're called only when [compositionBuffer length] > 0, but guard anyway
+    if (!_composedBuffer || [_composedBuffer length] == 0) {
+        return;
+    }
     [_composedBuffer deleteCharactersInRange:NSMakeRange([_composedBuffer length] - 1, 1)];
     [self findCurrentCandidates];
     [self updateComposition];
@@ -250,7 +442,36 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
 }
 
 - (void)insertTab:(id)sender {
-    [self commitText:@"\t"];
+    if (![self browseCandidatesBy:1]) {
+        [self commitText:@"\t"];
+    }
+}
+
+- (void)insertBacktab:(id)sender {
+    [self browseCandidatesBy:-1];
+}
+
+// Windows Avro's Tab browsing: step through the candidates instead of
+// committing. Returns NO when off or there is nothing to browse.
+- (BOOL)browseCandidatesBy:(NSInteger)step {
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:kTabBrowsingDefaultsKey] ||
+        [_currentCandidates count] < 2) {
+        return NO;
+    }
+    NSInteger target = _selectedCandidateIndex + step;
+    if (target < 0 || target >= (NSInteger)[_currentCandidates count]) {
+        return YES; // at the end: stay put, like the arrow keys
+    }
+    BOOL vertical = [[Candidates sharedInstance] panelType] == kIMKSingleColumnScrollingCandidatePanel;
+    if (step > 0) {
+        vertical ? [[Candidates sharedInstance] moveDown:self] : [[Candidates sharedInstance] moveRight:self];
+    } else {
+        vertical ? [[Candidates sharedInstance] moveUp:self] : [[Candidates sharedInstance] moveLeft:self];
+    }
+    // Also record it directly (index + learning) rather than relying only
+    // on the panel's callback.
+    [self candidateSelectionChanged:[_currentCandidates objectAtIndex:target]];
+    return YES;
 }
 
 - (void)insertNewline:(id)sender {
@@ -300,7 +521,9 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
 		// we might not handle the command.
 		
 		if (_composedBuffer && [_composedBuffer length] > 0) {
-            if (aSelector == @selector(insertTab:) 
+            if (aSelector == @selector(insertTab:)
+                || (aSelector == @selector(insertBacktab:) &&
+                    [[NSUserDefaults standardUserDefaults] boolForKey:kTabBrowsingDefaultsKey])
                 || aSelector == @selector(insertNewline:)
                 || aSelector == @selector(deleteBackward:)
                 || aSelector == @selector(moveLeft:)
@@ -316,8 +539,12 @@ static NSString * const kShowInlineBanglaDefaultsKey = @"ShowInlineBangla";
 }
 
 - (void)commitText:(NSString*)string {
-    if (_currentCandidates) {
-        [self candidateSelected:_currentCandidates[_selectedCandidateIndex]];
+    if (_currentCandidates && [_currentCandidates count] > 0) {
+        NSUInteger safeIndex = _selectedCandidateIndex;
+        if (safeIndex >= [_currentCandidates count]) {
+            safeIndex = 0;
+        }
+        [self candidateSelected:[_currentCandidates objectAtIndex:safeIndex]];
         [_currentClient insertText:string replacementRange:NSMakeRange(NSNotFound, 0)];
     }
     else {

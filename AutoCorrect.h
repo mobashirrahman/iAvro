@@ -8,21 +8,29 @@
 #import <Foundation/Foundation.h>
 
 @interface AutoCorrect : NSObject {
-  NSMutableDictionary *_autoCorrectEntries;
-  NSMutableDictionary *_userAutoCorrectEntries;
+    NSMutableDictionary* _autoCorrectEntries;
+    NSDictionary* _bundledEntries;
+    NSMutableDictionary* _userEntries;
 }
 
-@property(retain) NSMutableDictionary *autoCorrectEntries;
-@property(retain) NSMutableDictionary *userAutoCorrectEntries;
+@property (retain) NSMutableDictionary* autoCorrectEntries;
 
 + (AutoCorrect *)sharedInstance;
 
-- (NSString *)find:(NSString *)term;
-- (NSMutableDictionary *)autoCorrectEntries;
+- (NSString*)find:(NSString*)term;
+- (NSMutableDictionary*)autoCorrectEntries;
 - (void)setAutoCorrectEntries:(NSMutableDictionary *)autoCorrectEntries;
-- (void)addUserEntry:(NSString *)replace with:(NSString *)with;
-- (void)removeUserEntry:(NSString *)replace;
-- (void)saveUserEntries;
-- (BOOL)isUserEntry:(NSString *)key;
+
+// User entries overlay Application Support storage (bundle stays pristine).
+- (void)setUserAutoCorrect:(NSString *)correction forTerm:(NSString *)term;
+- (void)removeUserAutoCorrectForTerm:(NSString *)term;
+
+// Only the entries this user added, not the bundled dictionary, so an export
+// stays small and contains nothing they did not write.
+- (NSDictionary *)userAutoCorrectEntries;
+- (void)deleteAutoCorrectForTerm:(NSString *)term;
+- (void)setUserAutoCorrectEntries:(NSDictionary *)entries;
+- (NSString *)correctionForValue:(NSString *)value term:(NSString *)term;
++ (NSDictionary *)entriesFromDictionaryFile:(NSString *)path error:(NSError **)error;
 
 @end

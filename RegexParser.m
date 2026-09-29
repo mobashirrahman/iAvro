@@ -66,6 +66,17 @@ static RegexParser* sharedInstance = nil;
                 _casesensitive = [[NSString alloc] initWithString:[jsonArray objectForKey:@"casesensitive"]];
                 _patterns = [[NSArray alloc] initWithArray:[jsonArray objectForKey:@"patterns"]];
                 _maxPatternLength = [[[_patterns objectAtIndex:0] objectForKey:@"find"] length];
+                // Order-independent lookup: the table is not guaranteed to be
+                // in valid binary-search order, so build a hash index (last
+                // duplicate wins, matching previous observable behavior).
+                NSMutableDictionary *patternDict = [[NSMutableDictionary alloc] initWithCapacity:[_patterns count]];
+                for (NSDictionary *entry in _patterns) {
+                    NSString *key = [entry objectForKey:@"find"];
+                    if (key) {
+                        [patternDict setObject:entry forKey:key];
+                    }
+                }
+                _patternDict = patternDict;
             }
             
         } else {
@@ -80,7 +91,8 @@ static RegexParser* sharedInstance = nil;
     [_consonant release];
     [_casesensitive release];
     [_patterns release];
-    
+    [_patternDict release];
+
     [super dealloc];
 }
 
@@ -103,13 +115,11 @@ static RegexParser* sharedInstance = nil;
             if(end <= len) {
                 NSString* chunk = [fixed substringWithRange:NSMakeRange(start, chunkLen)];
                 
-                // Binary Search
-                NSInteger left = 0, right = [_patterns count] - 1, mid;
-                while(right >= left) {
-                    mid = (right + left) / 2;
-                    NSDictionary* pattern = [_patterns objectAtIndex:mid];
-                    NSString* find = [pattern objectForKey:@"find"];
-                    if([find isEqualToString:chunk]) {
+                // Order-independent hash lookup. The table is not guaranteed
+                // to be in valid binary-search order, so binary search could
+                // silently miss patterns.
+                NSDictionary* pattern = [_patternDict objectForKey:chunk];
+                if (pattern) {
                         NSArray* rules = [pattern objectForKey:@"rules"];
                         for(NSDictionary* rule in rules) {
                             
@@ -209,14 +219,6 @@ static RegexParser* sharedInstance = nil;
                         [output appendString:@"(্[যবম])?(্?)([ঃঁ]?)"];
                         cur = end - 1;
                         matched = TRUE;
-                        break;
-                    }
-                    else if ([find length] > [chunk length] || 
-                             ([find length] == [chunk length] && [find compare:chunk] == NSOrderedAscending)) {
-                        left = mid + 1;
-                    } else {
-                        right = mid - 1;
-                    }
                 }
                 if(matched == TRUE) break;                
             }
@@ -276,7 +278,10 @@ static RegexParser* sharedInstance = nil;
 
 - (BOOL)isExact:(NSString*) needle heystack:(NSString*)heystack start:(int)start end:(int)end not:(BOOL)not {
     int len = end - start;
-    return ((start >= 0 && end < [heystack length] 
+    if (len < 0) {
+        return (NO ^ not);
+    }
+    return ((start >= 0 && end <= (int)[heystack length]
              && [[heystack substringWithRange:NSMakeRange(start, len)] isEqualToString:needle]) ^ not);
 }
 
@@ -292,6 +297,10 @@ static RegexParser* sharedInstance = nil;
     NSInteger i, len = [string length];
     for (i = 0; i < len; ++i) {
         unichar c = [string characterAtIndex:i];
+        // regex.json's "casesensitive" set is the regex metacharacters
+        // (|()[]{}^$*+?. etc.), not case-sensitive letters. They are dropped
+        // on purpose so they can't be injected into the dictionary regex
+        // (e.g. "ki(re" would otherwise compile to an invalid pattern).
         if (![self isCaseSensitive:c]) {
             [fixed appendFormat:@"%C", [self smallCap:c]];
         }
