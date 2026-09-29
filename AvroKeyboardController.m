@@ -6,6 +6,7 @@
 //
 
 #import "AvroKeyboardController.h"
+#import <AppKit/AppKit.h>
 #import "MainMenuAppDelegate.h"
 #import "Suggestion.h"
 #import "Candidates.h"
@@ -13,7 +14,12 @@
 #import "RegexKitLite.h"
 #import "AvroParser.h"
 #import "AutoCorrect.h"
+#import "LanguageMode.h"
 #import "SettingsKeys.h"
+
+// Input-menu item that toggles English pass-through for the current
+// application. The tag is well clear of the 1-4 used by the shared menu.
+static const NSInteger kEnglishModeMenuItemTag = 100;
 
 @interface AvroKeyboardController ()
 - (NSString *)compositionDisplayString;
@@ -25,6 +31,9 @@
 - (NSString *)classicOutput;
 - (BOOL)browseCandidatesBy:(NSInteger)step;
 - (NSString *)englishCandidate;
+- (BOOL)isEnglishModeActive;
+- (NSString *)currentBundleIdentifier;
+- (void)removeEnglishModeMenuItemFromMenu:(NSMenu *)menu;
 @end
 
 @implementation AvroKeyboardController
@@ -403,6 +412,15 @@
     // Return YES to indicate the the key input was received and dealt with.  Key processing will not continue in that case.  In
     // other words the system will not deliver a key down event to the application.
     // Returning NO means the original key down will be passed on to the client.
+    if ([self isEnglishModeActive]) {
+        // Terminals and editors get the literal keystrokes. If a composition
+        // was already in progress when the mode was switched, commit it rather
+        // than discarding what the user typed.
+        if (_composedBuffer && [_composedBuffer length] > 0) {
+            [self commitComposition:sender];
+        }
+        return NO;
+    }
     if ([string isEqualToString:@" "]) {
         if (_currentCandidates && [_currentCandidates count] > 0) {
             // IMKCandidates:selectedCandidateString returns null for some reason, so null is commited when user presses enter.
@@ -525,6 +543,7 @@
                 || (aSelector == @selector(insertBacktab:) &&
                     [[NSUserDefaults standardUserDefaults] boolForKey:kTabBrowsingDefaultsKey])
                 || aSelector == @selector(insertNewline:)
+                || aSelector == @selector(cancelOperation:)
                 || aSelector == @selector(deleteBackward:)
                 || aSelector == @selector(moveLeft:)
                 || aSelector == @selector(moveRight:)
@@ -553,7 +572,79 @@
 }
 
 - (NSMenu*)menu {
-    return [(MainMenuAppDelegate *)[NSApp delegate] menu];
+    NSMenu *menu = [(MainMenuAppDelegate *)[NSApp delegate] menu];
+    NSString *bundleIdentifier = [[self client] bundleIdentifier];
+    NSString *name = nil;
+    if ([bundleIdentifier length] > 0) {
+        NSArray *running = [NSRunningApplication
+            runningApplicationsWithBundleIdentifier:bundleIdentifier];
+        name = [[running firstObject] localizedName];
+    }
+    if ([name length] == 0) {
+        [self removeEnglishModeMenuItemFromMenu:menu];
+        return menu;
+    }
+
+    NSMenuItem *item = [menu itemWithTag:kEnglishModeMenuItemTag];
+    if (item == nil) {
+        item = [[[NSMenuItem alloc]
+            initWithTitle:@"" action:@selector(toggleEnglishModeForCurrentApp:)
+           keyEquivalent:@""] autorelease];
+        [item setTag:kEnglishModeMenuItemTag];
+        [item setTarget:self];
+        [menu addItem:item];
+    }
+    [item setTitle:[NSString stringWithFormat:@"Use English in %@", name]];
+    [item setState:[self isEnglishModeActive] ? NSControlStateValueOn
+                                              : NSControlStateValueOff];
+    return menu;
+}
+
+- (void)removeEnglishModeMenuItemFromMenu:(NSMenu *)menu {
+    NSMenuItem *item = [menu itemWithTag:kEnglishModeMenuItemTag];
+    if (item) {
+        [menu removeItem:item];
+    }
+}
+
+// The client tells us which application is hosting this session, so the choice
+// is made per application rather than globally.
+- (NSString *)currentBundleIdentifier {
+    id client = [self client];
+    if (![client respondsToSelector:@selector(bundleIdentifier)]) {
+        return nil;
+    }
+    return [client bundleIdentifier];
+}
+
+- (BOOL)isEnglishModeActive {
+    return [LanguageMode isEnglishModeForBundleIdentifier:[self currentBundleIdentifier]];
+}
+
+- (IBAction)toggleEnglishModeForCurrentApp:(id)sender {
+    NSString *bundleIdentifier = [self currentBundleIdentifier];
+    if ([bundleIdentifier length] == 0) {
+        NSBeep();
+        return;
+    }
+    // An explicit choice is recorded either way, so a default-on application
+    // can be switched back to Bangla and the choice sticks.
+    [LanguageMode setEnglishMode:![self isEnglishModeActive]
+             forBundleIdentifier:bundleIdentifier];
+}
+
+// Esc returns the raw keystrokes, which is what you want when a word came out
+// as Bangla but was meant as English.
+- (void)cancelOperation:(id)sender {
+    if (!_composedBuffer || [_composedBuffer length] == 0) {
+        return;
+    }
+    NSString *literal = [[_composedBuffer copy] autorelease];
+    [self clearCompositionBuffer];
+    [_currentCandidates removeAllObjects];
+    [self updateComposition];
+    [self updateCandidatesPanel];
+    [_currentClient insertText:literal replacementRange:NSMakeRange(NSNotFound, 0)];
 }
 
 - (void)showPreferences:(id)sender {

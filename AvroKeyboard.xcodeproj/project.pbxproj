@@ -37,6 +37,7 @@
 		8D11072B0486CEB800E47090 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 089C165CFE840E0CC02AAC07 /* InfoPlist.strings */; };
 		8D11072D0486CEB800E47090 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 29B97316FDCFA39411CA2CEA /* main.m */; settings = {ATTRIBUTES = (); }; };
 		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
+		8ECE3FA4B230B4A6CADB1EA3 /* LanguageMode.m in Sources */ = {isa = PBXBuildFile; fileRef = 10A6ECCB60FBEB618635E007 /* LanguageMode.m */; };
 		A49A45DE95DCB21C7E66D8A5 /* libPods-Avro Keyboard.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 37361BFC8512F1D38B7962DD /* libPods-Avro Keyboard.a */; };
 		A5415422A0ADDACD364923C7 /* extra-words.tsv in Resources */ = {isa = PBXBuildFile; fileRef = 7EB848FF7A76CB5DF25BAB14 /* extra-words.tsv */; };
 		A8F5F7B1A1FEFF985AFC5497 /* TypoCorrections.m in Sources */ = {isa = PBXBuildFile; fileRef = C10B2B744A569484F0AAB3AF /* TypoCorrections.m */; };
@@ -49,6 +50,7 @@
 		089C165DFE840E0CC02AAC07 /* English */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = English; path = English.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		0E6D5EEB4DC3CE1A80DFF523 /* UserDictionary.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = UserDictionary.h; sourceTree = "<group>"; };
 		1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = /System/Library/Frameworks/Cocoa.framework; sourceTree = "<absolute>"; };
+		10A6ECCB60FBEB618635E007 /* LanguageMode.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = LanguageMode.m; sourceTree = "<group>"; };
 		29B97316FDCFA39411CA2CEA /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		29B97324FDCFA39411CA2CEA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = /System/Library/Frameworks/AppKit.framework; sourceTree = "<absolute>"; };
 		29B97325FDCFA39411CA2CEA /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = /System/Library/Frameworks/Foundation.framework; sourceTree = "<absolute>"; };
@@ -95,6 +97,7 @@
 		832F56401F994B6500432D7A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
 		8D1107310486CEB800E47090 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8D1107320486CEB800E47090 /* Avro Keyboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Avro Keyboard.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8DD1EAB3E6FF6BEB06EB6BBA /* LanguageMode.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = LanguageMode.h; sourceTree = "<group>"; };
 		9BE514399134C547D83E8518 /* Pods-Avro Keyboard.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Avro Keyboard.debug.xcconfig"; path = "Pods/Target Support Files/Pods-Avro Keyboard/Pods-Avro Keyboard.debug.xcconfig"; sourceTree = "<group>"; };
 		BE53712CF0B15B5AB0AE55F8 /* SettingsKeys.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = SettingsKeys.m; sourceTree = "<group>"; };
 		C09CC684F0E6C77B2D92733A /* TypoCorrections.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = TypoCorrections.h; sourceTree = "<group>"; };
@@ -180,6 +183,8 @@
 				E8778558D106EAA7001AD229 /* data */,
 				C10B2B744A569484F0AAB3AF /* TypoCorrections.m */,
 				C09CC684F0E6C77B2D92733A /* TypoCorrections.h */,
+				10A6ECCB60FBEB618635E007 /* LanguageMode.m */,
+				8DD1EAB3E6FF6BEB06EB6BBA /* LanguageMode.h */,
 			);
 			name = NumberInput;
 			sourceTree = "<group>";
@@ -450,6 +455,7 @@
 				C6BE383857FD5013D65E9302 /* SettingsKeys.m in Sources */,
 				251D8B5BD0E018032C0E4548 /* UserDictionary.m in Sources */,
 				A8F5F7B1A1FEFF985AFC5497 /* TypoCorrections.m in Sources */,
+				8ECE3FA4B230B4A6CADB1EA3 /* LanguageMode.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
