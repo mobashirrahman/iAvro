@@ -302,6 +302,7 @@
 				7EB848FF7A76CB5DF25BAB14 /* extra-words.tsv */,
 			);
 			name = data;
+			path = data;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
