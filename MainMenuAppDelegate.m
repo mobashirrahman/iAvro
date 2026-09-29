@@ -14,6 +14,7 @@
 #import "Database.h"
 #import "RegexParser.h"
 #import "UserDictionary.h"
+#import "VersionInfo.h"
 
 // Sparkle owns the update feed and the user-initiated update check. Keeping a
 // strong reference is required: SPUStandardUpdaterController does not retain
@@ -53,6 +54,8 @@ static SPUStandardUpdaterController *sUpdaterController = nil;
     [checkForUpdates setTarget:self];
 
     [self addDictionaryMenuItems];
+
+    [self addAboutMenuItem];
 
     [self startUpdater];
 
@@ -160,6 +163,26 @@ static SPUStandardUpdaterController *sUpdaterController = nil;
     [alert setInformativeText:informative];
     [alert addButtonWithTitle:@"OK"];
     [alert runModal];
+}
+
+- (void)addAboutMenuItem {
+    // The standard panel reads CFBundleName, the version and the bundled
+    // Credits.rtfd, so the version can never drift from the bundle.
+    NSMenuItem *about = [_menu itemWithTag:5];
+    if (about == nil) {
+        about = [[[NSMenuItem alloc] initWithTitle:@"About Avro Keyboard"
+                                            action:@selector(showAbout:)
+                                     keyEquivalent:@""] autorelease];
+        [about setTag:5];
+        [_menu addItem:about];
+    }
+    [about setAction:@selector(showAbout:)];
+    [about setTarget:self];
+}
+
+- (IBAction)showAbout:(id)sender {
+    [NSApp activateIgnoringOtherApps:YES];
+    [NSApp orderFrontStandardAboutPanel:sender];
 }
 
 - (void)startUpdater {    if (sUpdaterController != nil) {

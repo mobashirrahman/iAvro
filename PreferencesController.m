@@ -10,6 +10,7 @@
 #import "AutoCorrectItem.h"
 #import "SettingsKeys.h"
 #import "AvroParser.h"
+#import "VersionInfo.h"
 
 @implementation PreferencesController
 
@@ -59,7 +60,32 @@
   [_aboutContent
       readRTFDFromFile:[[NSBundle mainBundle] pathForResource:@"Credits"
                                                        ofType:@"rtfd"]];
+  [self prependVersionToAboutText];
   [_aboutContent scrollToBeginningOfDocument:_aboutContent];
+}
+
+// The version is prepended to the credits text rather than placed in its own
+// label: the About view is a full-height scroll view, and adding a label would
+// mean resizing it, which cannot be checked without running the window.
+- (void)prependVersionToAboutText {
+  if (!_aboutContent) {
+    return;
+  }
+  NSString *line = [NSString stringWithFormat:@"%@\n\n",
+                                              [VersionInfo displaySummary]];
+
+  NSMutableAttributedString *existing =
+      [[[_aboutContent textStorage] copy] autorelease];
+  NSDictionary *attributes = [NSDictionary dictionaryWithObjectsAndKeys:
+      [NSFont boldSystemFontOfSize:0], NSFontAttributeName,
+      nil];
+  NSAttributedString *header = [[[NSAttributedString alloc]
+      initWithString:line attributes:attributes] autorelease];
+  NSMutableAttributedString *combined =
+      [[[NSMutableAttributedString alloc] initWithAttributedString:header]
+          autorelease];
+  [combined appendAttributedString:existing];
+  [[_aboutContent textStorage] setAttributedString:combined];
 }
 
 - (NSRect)newFrameForNewContentView:(NSView *)view {

@@ -53,6 +53,7 @@ SOURCES=(
   "$REPO_ROOT/UserDictionary.m"
   "$REPO_ROOT/TypoCorrections.m"
   "$REPO_ROOT/LanguageMode.m"
+  "$REPO_ROOT/VersionInfo.m"
   "$REPO_ROOT/Pods/RegexKitLite/RegexKitLite-4.0/RegexKitLite.m"
   "$REPO_ROOT/Pods/FMDB/src/fmdb/FMDatabase.m"
   "$REPO_ROOT/Pods/FMDB/src/fmdb/FMDatabaseAdditions.m"
@@ -69,6 +70,7 @@ TESTS=(
   test_user_dictionary
   test_typo_corrections
   test_language_mode
+  test_version_display
 )
 
 COMMON_FLAGS=(

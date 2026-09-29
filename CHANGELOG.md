@@ -37,6 +37,9 @@ Notable changes, newest first. Version numbers follow `CFBundleShortVersionStrin
   older two-column files still import.
 - **Auto-updates** via Sparkle, signed with EdDSA keys. No Apple Developer
   Program membership required.
+- **Version is visible** in the About panel (input menu) and at the top of the
+  Preferences About tab, including the build number and architecture, so it is
+  obvious which build is installed.
 - **Releases are cut by pushing a version tag**; CI attaches the universal
   build to a GitHub Release and refuses to publish if the tag and the app
   version disagree.
