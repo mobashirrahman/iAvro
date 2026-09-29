@@ -2,6 +2,22 @@
 
 Notable changes, newest first. Version numbers follow `CFBundleShortVersionString`.
 
+## 2.0.7
+
+Supersedes 2.0.6, which was published without the version display below and was
+never installed for testing.
+
+### Added
+- **Version is visible** in the About panel (input menu) and on the first line
+  of the Preferences About tab, including the build number and architecture, so
+  it is obvious which build is installed.
+
+### Fixed
+- Release notes were the tagged commit's message rather than the annotated tag
+  message, so the install instructions never reached the release page.
+- The release job could not read the app version at all; it runs on Linux,
+  where `PlistBuddy` does not exist.
+
 ## 2.0.6
 
 > Not notarized, and not yet verified in a live input session. See the install

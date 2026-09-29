@@ -59,7 +59,7 @@ These cover the highest-risk and highest-value paths.
 | A10 | Press Backspace twice with nothing composed | nothing happens, no crash |
 | A11 | Quit and reopen the app, retype a word you picked earlier | your earlier pick is offered first |
 | A12 | Input menu → **Check for Updates…** | a window or no-op, **no crash** |
-| A13 | Input menu → **About Avro Keyboard** | shows **2.0.6 (build 6)** and the credits |
+| A13 | Input menu → **About Avro Keyboard** | shows the version and build, matching the release you downloaded |
 | A14 | Preferences → About tab | the first line reads the same version |
 
 ---
@@ -71,7 +71,7 @@ you are testing what you think you are.
 
 | # | Do this | Expect |
 |---|---|---|
-| A2-1 | Input menu → About Avro Keyboard | version line, e.g. `2.0.6 (build 6)` |
+| A2-1 | Input menu → About Avro Keyboard | a version line, e.g. `X.Y.Z (build N)` |
 | A2-2 | Preferences → About | same version on the first line, plus architecture |
 | A2-3 | Compare with the release page you downloaded from | versions match |
 | A2-4 | Finder → the app → Get Info | same short version and build |
