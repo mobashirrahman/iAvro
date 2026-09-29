@@ -1,5 +1,12 @@
 # iAvro Bug Report and Improvement Plan
 
+> **Status: every P0 defect listed here is fixed and covered by the test suite.**
+> This file is kept as the record of *what was wrong*. For what to build next,
+> and for the approaches that were investigated and rejected, see
+> [`ROADMAP.md`](ROADMAP.md). For shipped changes see [`CHANGELOG.md`](CHANGELOG.md).
+> Fixed in commits `12ec9b5` through `fb4b49d`; the suite that guards them is
+> `Tests/run_tests.sh` (155 checks).
+>
 > For agents: source of truth for known defects and work order.
 > Scope: `/Users/mobashirrahman/Documents/iAvro`, ObjC MRR IMK input method.
 > Method: static code review only. No runtime profiling.
