@@ -5,18 +5,48 @@ Notable changes, newest first. Version numbers follow `CFBundleShortVersionStrin
 ## 2.0.7
 
 Supersedes 2.0.6, which was published without the version display below and was
-never installed for testing.
+never installed for testing. Everything added in 2.0.6 is included.
 
 ### Added
 - **Version is visible** in the About panel (input menu) and on the first line
   of the Preferences About tab, including the build number and architecture, so
   it is obvious which build is installed.
+- **1,207 missing dictionary words**, raising the share of the bundled wordlist
+  that can be retrieved from 43.1% to 57.2%.
+- **Candidates ranked by what you actually commit**, so a word you have chosen
+  before is offered first for that term.
+- **User dictionary export and import**, covering AutoCorrect entries and
+  learned words, in one commented text file.
+- **Per-application English pass-through**: terminals and editors receive
+  literal keystrokes instead of Bangla, with a per-app toggle in the input
+  menu.
+- **Esc undoes a composition**, inserting the literal keystrokes instead.
+- **Doubled-letter typo correction**: `kothha` offers কথা.
+- **Auto-updates** via Sparkle, signed with EdDSA keys, requiring no Apple
+  Developer Program membership.
+- **Releases are cut by pushing a version tag**, and the tag is checked against
+  the app version so a release cannot ship a stale number.
 
 ### Fixed
-- Release notes were the tagged commit's message rather than the annotated tag
-  message, so the install instructions never reached the release page.
+- **`TH`, `H` and `qq` were silently dropped** by the transliterator: the
+  pattern tables are not in valid binary-search order, so the search missed
+  real entries.
+- **The auto-update release path could never have worked**: the signing call
+  used arguments Sparkle no longer accepts, the appcast carried a duplicate
+  `length` attribute, and a signed release uploaded a filename the appcast did
+  not point at.
+- Release notes were the tagged commit's message rather than the intended text,
+  so install instructions never reached the release page.
 - The release job could not read the app version at all; it runs on Linux,
   where `PlistBuddy` does not exist.
+- `weight.plist` was lost whenever the app was killed, and a corrupt file left
+  the cache unusable.
+- AutoCorrect values could be overwritten with the Roman phonetic, and user
+  entries were written into the signed app bundle.
+- Candidate list corruption, uninitialised selection index, empty-input
+  crashes, and regex metacharacters being injected into the dictionary search.
+- The minimum system was raised to macOS 11.0, hardened runtime enabled, and a
+  third-party Developer ID removed so anyone can sign the project.
 
 ## 2.0.6
 

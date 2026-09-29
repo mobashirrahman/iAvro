@@ -56,6 +56,13 @@ jobs:
       - name: Check generated word list is in sync
         run: python3 tools/build_extra_words.py --check
 
+      - name: Check release notes exist for this version
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 -c 'import plistlib; print(plistlib.load(open("Info.plist","rb"))["CFBundleShortVersionString"])')
+          python3 tools/release_notes.py "$VERSION" > /dev/null
+          echo "CHANGELOG.md has a section for $VERSION"
+
       - name: Build (universal)
         run: |
           set -euo pipefail
@@ -184,12 +191,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          # The release notes are the annotated tag's message, and the default
-          # shallow checkout does not fetch the tag object: git then falls back
-          # to the commit message, which is not what should be published.
-          fetch-depth: 0
-          fetch-tags: true
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
@@ -257,14 +258,20 @@ jobs:
         run: |
           set -euo pipefail
           NOTES=$(mktemp)
-          # for-each-ref against the tag ref reads the annotation itself,
-          # rather than resolving the name and risking the commit message.
-          git for-each-ref --format='%(contents)' "refs/tags/$GITHUB_REF_NAME" > "$NOTES"
-          if [ ! -s "$NOTES" ]; then
-            echo "::notice::No annotated tag message found; using a generic body"
-            printf 'Avro Keyboard %s (build %s)\n\nUniversal build for Apple Silicon and Intel Macs.\n' \
-              "$SHORT" "$BUILD" > "$NOTES"
-          fi
+          # Notes come from CHANGELOG.md, not from the annotated tag: the tag
+          # object is not available on the runner, and reading it published the
+          # tagged commit's message instead. The change log is the canonical
+          # record and is present in the working tree.
+          python3 tools/release_notes.py "$SHORT" > "$NOTES" || {
+            echo "::error::CHANGELOG.md has no section for $SHORT."
+            echo "Add one before tagging, so the release has real notes."
+            exit 1
+          }
+          # Standing install and testing instructions follow the change log.
+          printf '\n' >> "$NOTES"
+          cat .github/release-footer.md >> "$NOTES"
+          echo "--- release notes ---"
+          cat "$NOTES"
           gh release create "$GITHUB_REF_NAME" dist/AvroKeyboard-macOS.zip \
             --title "Avro Keyboard $SHORT" \
             --notes-file "$NOTES"
