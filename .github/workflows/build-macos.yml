@@ -288,17 +288,25 @@ jobs:
               commit -q -m "Update appcast for $GITHUB_REF_NAME"
           git push -q --force origin appcast
 
-          # Fetch the exact URL the app uses, so a feed that is not actually
-          # reachable fails the release instead of failing silently later.
-          FEED_URL=$(python3 -c 'import plistlib; print(plistlib.load(open("'"$GITHUB_WORKSPACE"'/Info.plist","rb"))["SUFeedURL"])')
-          for attempt in 1 2 3 4 5; do
-            if curl -sSfL "$FEED_URL" | grep -q "<rss"; then
-              echo "::notice::feed is live at $FEED_URL"
-              exit 0
-            fi
-            echo "attempt $attempt: feed not readable yet, retrying"
-            sleep 10
-          done
-          echo "::error::$FEED_URL did not serve the feed."
-          echo "Check that the appcast branch exists and SUFeedURL matches it."
-          exit 1
+          # Verify the published feed announces *this* release, not merely that
+          # something is reachable. The branch is read back through the API
+          # because it is authoritative: raw.githubusercontent.com is CDN
+          # cached for five minutes, so the URL the app uses can lag behind a
+          # release by that long and still be perfectly correct.
+          python3 - "$GITHUB_WORKSPACE/Info.plist" "$GITHUB_REPOSITORY" <<'PYEOF'
+          import base64, json, plistlib, sys, urllib.request
+          info, repo = sys.argv[1], sys.argv[2]
+          feed_url = plistlib.load(open(info, "rb"))["SUFeedURL"]
+          expected = plistlib.load(open(info, "rb"))["CFBundleVersion"]
+
+          url = "https://api.github.com/repos/%s/contents/appcast.xml?ref=appcast" % repo
+          with urllib.request.urlopen(url) as response:
+              content = json.load(response)["content"]
+          published = base64.b64decode(content).decode("utf-8")
+
+          if ">%s</sparkle:version>" % expected not in published:
+              sys.exit("::error::the appcast branch does not announce build %s" % expected)
+          print("appcast branch announces build %s" % expected)
+          print("the app fetches: %s" % feed_url)
+          print("note: that URL is CDN cached for up to 5 minutes after a release")
+          PYEOF
