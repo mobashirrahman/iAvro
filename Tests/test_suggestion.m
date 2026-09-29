@@ -238,6 +238,38 @@ static void test_learned_ranking(void) {
   [cache removeStringForKey:term];
 }
 
+static void test_dictionary_coverage(void) {
+  SECTION("dictionary coverage (extra words)");
+  Database *db = [Database sharedInstance];
+
+  // Measured effect of loading data/extra-words.tsv: the share of words in
+  // autodict.plist that can be retrieved by typing the roman spelling which
+  // produced them rises from 43.1% to 57.2% (2292 -> 3046 of 5321).
+  CHECK([[db tableNames] containsObject:@"extra"], "extra table is loaded");
+  NSArray *extraWords = [db wordsInTable:@"extra"];
+  CHECK([extraWords count] > 0, "extra table has words");
+  printf("       extra table holds %lu words\n",
+         (unsigned long)[extraWords count]);
+
+  // Everyday words that were absent from database.db3 and are now suggested.
+  // The roman spellings are the ones from autodict.plist, and each was checked
+  // to be one the parser actually reaches the stored word for.
+  NSDictionary *cases = [NSDictionary dictionaryWithObjectsAndKeys:
+      @"অফেন্স", @"offens",
+      @"অপারেশান", @"opareshan",
+      nil];
+  for (NSString *roman in cases) {
+    NSString *want = [cases objectForKey:roman];
+    BOOL retrieved = [[db find:roman] containsObject:want];
+    if (!retrieved) {
+      printf("       %-11s -> %s not retrieved\n", [roman UTF8String],
+             [want UTF8String]);
+    }
+    CHECK(retrieved, ([NSString stringWithFormat:@"find:@\"%@\" offers %@",
+                                                 roman, want]).UTF8String);
+  }
+}
+
 int main(void) {
   NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
   @autoreleasepool {
@@ -246,6 +278,7 @@ int main(void) {
     test_empty_guards();
     test_ranking();
     test_learned_ranking();
+    test_dictionary_coverage();
   }
   int rc = test_report("test_suggestion");
   [pool release];

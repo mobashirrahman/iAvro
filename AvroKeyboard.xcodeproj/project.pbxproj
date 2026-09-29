@@ -38,6 +38,7 @@
 		8D11072D0486CEB800E47090 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 29B97316FDCFA39411CA2CEA /* main.m */; settings = {ATTRIBUTES = (); }; };
 		8D11072F0486CEB800E47090 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
 		A49A45DE95DCB21C7E66D8A5 /* libPods-Avro Keyboard.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 37361BFC8512F1D38B7962DD /* libPods-Avro Keyboard.a */; };
+		A5415422A0ADDACD364923C7 /* extra-words.tsv in Resources */ = {isa = PBXBuildFile; fileRef = 7EB848FF7A76CB5DF25BAB14 /* extra-words.tsv */; };
 		C6BE383857FD5013D65E9302 /* SettingsKeys.m in Sources */ = {isa = PBXBuildFile; fileRef = BE53712CF0B15B5AB0AE55F8 /* SettingsKeys.m */; };
 		E93074B70A5C264700470842 /* InputMethodKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E93074B60A5C264700470842 /* InputMethodKit.framework */; };
 		E93074E20A5C2F1200470842 /* AvroKeyboardController.m in Sources */ = {isa = PBXBuildFile; fileRef = E93074E10A5C2F1200470842 /* AvroKeyboardController.m */; };
@@ -87,6 +88,7 @@
 		35F4DE7D1594096B001EAC81 /* AvroParser.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AvroParser.h; sourceTree = "<group>"; };
 		35F4DE7E1594096B001EAC81 /* AvroParser.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AvroParser.m; sourceTree = "<group>"; };
 		37361BFC8512F1D38B7962DD /* libPods-Avro Keyboard.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Avro Keyboard.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		7EB848FF7A76CB5DF25BAB14 /* extra-words.tsv */ = {isa = PBXFileReference; includeInIndex = 1; path = "extra-words.tsv"; sourceTree = "<group>"; };
 		832F563B1F993C5800432D7A /* IMPreferences.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IMPreferences.h; sourceTree = "<group>"; };
 		832F563C1F993C5800432D7A /* IMPreferences.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IMPreferences.m; sourceTree = "<group>"; };
 		832F56401F994B6500432D7A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
@@ -172,6 +174,7 @@
 				DDDA97BE03464C15B5058815 /* Pods */,
 				CC1DBB81AC5D68774A4CEE68 /* UserDictionary.m */,
 				0E6D5EEB4DC3CE1A80DFF523 /* UserDictionary.h */,
+				E8778558D106EAA7001AD229 /* data */,
 			);
 			name = NumberInput;
 			sourceTree = "<group>";
@@ -293,6 +296,14 @@
 			name = Pods;
 			sourceTree = "<group>";
 		};
+		E8778558D106EAA7001AD229 /* data */ = {
+			isa = PBXGroup;
+			children = (
+				7EB848FF7A76CB5DF25BAB14 /* extra-words.tsv */,
+			);
+			name = data;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -366,6 +377,7 @@
 				356B186D15A4499B00091215 /* Credits.png in Resources */,
 				356B186E15A4499B00091215 /* General.png in Resources */,
 				3587CCD815A7C5E50074BFF1 /* preferences.plist in Resources */,
+				A5415422A0ADDACD364923C7 /* extra-words.tsv in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

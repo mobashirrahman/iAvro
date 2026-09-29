@@ -53,6 +53,9 @@ jobs:
       - name: Run regression tests
         run: Tests/run_tests.sh
 
+      - name: Check generated word list is in sync
+        run: python3 tools/build_extra_words.py --check
+
       - name: Build (universal)
         run: |
           set -euo pipefail

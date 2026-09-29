@@ -29,7 +29,7 @@ fi
 
 # The parsers and database read their data via -[NSBundle mainBundle], so run
 # the test binaries from a directory that acts as the bundle root.
-cp "$REPO_ROOT/data.json" "$REPO_ROOT/regex.json" \
+cp "$REPO_ROOT/data.json" "$REPO_ROOT/regex.json" "$REPO_ROOT/data/extra-words.tsv" \
    "$REPO_ROOT/autodict.plist" "$REPO_ROOT/database.db3" "$BUILD_DIR/"
 
 INCLUDES=(
