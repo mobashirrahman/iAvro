@@ -184,6 +184,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # The release notes are the annotated tag's message, and the default
+          # shallow checkout does not fetch the tag object: git then falls back
+          # to the commit message, which is not what should be published.
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
@@ -251,8 +257,11 @@ jobs:
         run: |
           set -euo pipefail
           NOTES=$(mktemp)
-          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > "$NOTES"
+          # for-each-ref against the tag ref reads the annotation itself,
+          # rather than resolving the name and risking the commit message.
+          git for-each-ref --format='%(contents)' "refs/tags/$GITHUB_REF_NAME" > "$NOTES"
           if [ ! -s "$NOTES" ]; then
+            echo "::notice::No annotated tag message found; using a generic body"
             printf 'Avro Keyboard %s (build %s)\n\nUniversal build for Apple Silicon and Intel Macs.\n' \
               "$SHORT" "$BUILD" > "$NOTES"
           fi
