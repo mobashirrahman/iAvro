@@ -9,6 +9,8 @@
 #import "FMDatabase.h"
 #import "RegexKitLite.h"
 #import "RegexParser.h"
+#import "TypoCorrections.h"
+
 
 static Database *sharedInstance = nil;
 
@@ -212,10 +214,45 @@ static Database *sharedInstance = nil;
   [results close];
 }
 
+// A term that already returns several candidates is trusted as typed. Below
+// this many, the term is either a typo or an unusual romanisation, so a few
+// cheap corrections are consulted as well. Measured: gating on "no results at
+// all" almost never fires, because a mistyped term usually still matches
+// *something*, just not the word that was meant.
+static const NSUInteger kWeakResultCount = 3;
+
 - (NSArray *)find:(NSString *)term {
   if (!term || [term length] == 0) {
     return [NSArray array];
   }
+
+  NSMutableArray *matches =
+      [[[self searchExactly:term] mutableCopy] autorelease];
+  if ([matches count] >= kWeakResultCount) {
+    return matches;
+  }
+
+  // Try a small number of cheap corrections, stopping at the first that finds
+  // something, and keep those results too: a mistyped term often matches a
+  // wrong word, and the right one is worth offering alongside it. Ranking in
+  // Suggestion decides the order, so the corrected word can still surface.
+  for (NSString *correction in [TypoCorrections correctionsForTerm:term]) {
+    NSArray *corrected = [self searchExactly:correction];
+    if ([corrected count] == 0) {
+      continue;
+    }
+    for (NSString *word in corrected) {
+      if (![matches containsObject:word]) {
+        [matches addObject:word];
+      }
+    }
+    break;
+  }
+
+  return matches;
+}
+
+- (NSArray *)searchExactly:(NSString *)term {
   // Left Most Character
   unichar lmc = [[term lowercaseString] characterAtIndex:0];
   NSString *regex = [NSString

@@ -51,6 +51,7 @@ SOURCES=(
   "$REPO_ROOT/NSString+Levenshtein.m"
   "$REPO_ROOT/SettingsKeys.m"
   "$REPO_ROOT/UserDictionary.m"
+  "$REPO_ROOT/TypoCorrections.m"
   "$REPO_ROOT/Pods/RegexKitLite/RegexKitLite-4.0/RegexKitLite.m"
   "$REPO_ROOT/Pods/FMDB/src/fmdb/FMDatabase.m"
   "$REPO_ROOT/Pods/FMDB/src/fmdb/FMDatabaseAdditions.m"
@@ -65,6 +66,7 @@ TESTS=(
   test_storage
   test_controller
   test_user_dictionary
+  test_typo_corrections
 )
 
 COMMON_FLAGS=(
