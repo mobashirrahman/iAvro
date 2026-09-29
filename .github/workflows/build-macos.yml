@@ -7,13 +7,35 @@ on:
       - main
       - master
       - fix/bug-series
+  pull_request:
+
+env:
+  # Xcode 26.2 is the newest build that ships the macOS 26.2 SDK, which is the
+  # SDK the app is developed against. Override to test other toolchains.
+  XCODE_VERSION: "26.2"
 
 jobs:
   build:
-    runs-on: macos-15
+    # macos-26 is Apple Silicon and carries the full Xcode 26.x line
+    # (26.0.1 - 26.6). macos-15 only ships up to 26.0.
+    runs-on: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          XCODE_PATH="/Applications/Xcode_${XCODE_VERSION}.app"
+          if [ ! -d "$XCODE_PATH" ]; then
+            echo "::error::Xcode ${XCODE_VERSION} not installed on this image"
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_PATH"
+          echo "DEVELOPER_DIR=$XCODE_PATH" >> "$GITHUB_ENV"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i macos
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -60,6 +82,14 @@ jobs:
           lipo -info "$BIN" | grep -q "x86_64" || { echo "FAIL: missing x86_64 slice"; exit 1; }
           lipo -info "$BIN" | grep -q "arm64"  || { echo "FAIL: missing arm64 slice"; exit 1; }
           echo "OK: universal x86_64 + arm64"
+          echo "--- minimum OS per slice ---"
+          for arch in x86_64 arm64; do
+            printf '%-8s ' "$arch"
+            otool -arch "$arch" -l "$BIN" \
+              | grep -A4 -E "LC_VERSION_MIN_MACOSX|LC_BUILD_VERSION" \
+              | grep -E "minos|sdk" | tr '\n' ' '
+            echo
+          done
 
       - name: Verify hardened runtime
         run: |
