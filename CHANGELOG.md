@@ -2,6 +2,18 @@
 
 Notable changes, newest first. Version numbers follow `CFBundleShortVersionString`.
 
+## 2.0.9
+
+This release exists so that an installed 2.0.8 has something to update to: it is
+the first pair of releases where the update feed is populated, and the first
+chance to check the update path end to end.
+
+### Fixed
+- The feed publishing step used `xmllint`, which is not installed on the
+  runner, so the feed was still not published. Validation is now a `python3`
+  XML parse, and the release job's commands were audited for other macOS-only
+  tooling.
+
 ## 2.0.8
 
 ### Fixed
