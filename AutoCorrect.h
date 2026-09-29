@@ -24,6 +24,10 @@
 // User entries overlay Application Support storage (bundle stays pristine).
 - (void)setUserAutoCorrect:(NSString *)correction forTerm:(NSString *)term;
 - (void)removeUserAutoCorrectForTerm:(NSString *)term;
+
+// Only the entries this user added, not the bundled dictionary, so an export
+// stays small and contains nothing they did not write.
+- (NSDictionary *)userAutoCorrectEntries;
 - (void)deleteAutoCorrectForTerm:(NSString *)term;
 - (void)setUserAutoCorrectEntries:(NSDictionary *)entries;
 - (NSString *)correctionForValue:(NSString *)value term:(NSString *)term;

@@ -9,9 +9,11 @@
 #import <Sparkle/Sparkle.h>
 
 #import "AutoCorrect.h"
+#import "AvroParser.h"
 #import "CacheManager.h"
 #import "Database.h"
 #import "RegexParser.h"
+#import "UserDictionary.h"
 
 // Sparkle owns the update feed and the user-initiated update check. Keeping a
 // strong reference is required: SPUStandardUpdaterController does not retain
@@ -50,6 +52,8 @@ static SPUStandardUpdaterController *sUpdaterController = nil;
     [checkForUpdates setAction:@selector(checkForUpdates:)];
     [checkForUpdates setTarget:self];
 
+    [self addDictionaryMenuItems];
+
     [self startUpdater];
 
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
@@ -61,8 +65,104 @@ static SPUStandardUpdaterController *sUpdaterController = nil;
     [AutoCorrect sharedInstance];
 }
 
-- (void)startUpdater {
-    if (sUpdaterController != nil) {
+// Import/Export live in the input menu rather than the AutoCorrect pane: the
+// pane's button row has no free space, and these act on the whole dictionary
+// rather than one entry.
+- (void)addDictionaryMenuItems {
+    NSMenuItem *exportItem = [_menu itemWithTag:3];
+    if (exportItem == nil) {
+        exportItem = [[[NSMenuItem alloc] initWithTitle:@"Export User Dictionary…"
+                                                 action:@selector(exportUserDictionary:)
+                                          keyEquivalent:@""] autorelease];
+        [exportItem setTag:3];
+        [_menu addItem:exportItem];
+    }
+    [exportItem setAction:@selector(exportUserDictionary:)];
+    [exportItem setTarget:self];
+
+    NSMenuItem *importItem = [_menu itemWithTag:4];
+    if (importItem == nil) {
+        importItem = [[[NSMenuItem alloc] initWithTitle:@"Import User Dictionary…"
+                                                 action:@selector(importUserDictionary:)
+                                          keyEquivalent:@""] autorelease];
+        [importItem setTag:4];
+        [_menu addItem:importItem];
+    }
+    [importItem setAction:@selector(importUserDictionary:)];
+    [importItem setTarget:self];
+}
+
+- (IBAction)exportUserDictionary:(id)sender {
+    NSSavePanel *panel = [NSSavePanel savePanel];
+    [panel setNameFieldStringValue:@"AvroKeyboard-user-dictionary.txt"];
+    [panel setMessage:@"Export your AutoCorrect entries and learned words."];
+    if ([panel runModal] != NSModalResponseOK) {
+        return;
+    }
+    NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+    NSString *text = [UserDictionary
+        textForAutoCorrectEntries:[[AutoCorrect sharedInstance] userAutoCorrectEntries]
+                     learnedCounts:[[CacheManager sharedInstance] countSnapshot]
+                        appVersion:version];
+    NSError *error = nil;
+    if (![UserDictionary writeText:text toPath:[[panel URL] path] error:&error]) {
+        [self alertWithMessage:@"Cannot export the user dictionary"
+                  informative:error ? [error localizedDescription]
+                                    : @"The file could not be written."];
+    }
+}
+
+- (IBAction)importUserDictionary:(id)sender {
+    NSOpenPanel *panel = [NSOpenPanel openPanel];
+    [panel setMessage:@"Import AutoCorrect entries and learned words."];
+    if ([panel runModal] != NSModalResponseOK) {
+        return;
+    }
+    NSError *error = nil;
+    NSString *text = [NSString stringWithContentsOfFile:[[panel URL] path]
+                                                encoding:NSUTF8StringEncoding
+                                                   error:&error];
+    NSDictionary *parsed = text ? [UserDictionary parseText:text] : nil;
+    if (!parsed) {
+        [self alertWithMessage:@"Cannot import the user dictionary"
+                  informative:error ? [error localizedDescription]
+                                    : @"The file must be UTF-8 text, either the format this app exports "
+                                      @"or one \"term value\" pair per line."];
+        return;
+    }
+
+    NSDictionary *entries = [parsed objectForKey:@"autocorrect"];
+    NSDictionary *counts = [parsed objectForKey:@"learned"];
+    // Terms are normalised the same way the editor does, so an entry typed in
+    // any case still matches what the parser produces.
+    NSMutableDictionary *normalized = [NSMutableDictionary dictionaryWithCapacity:[entries count]];
+    for (NSString *term in entries) {
+        NSString *key = [[AvroParser sharedInstance] fix:term];
+        if ([key length]) {
+            [normalized setObject:[entries objectForKey:term] forKey:key];
+        }
+    }
+    if ([normalized count] > 0) {
+        [[AutoCorrect sharedInstance] setUserAutoCorrectEntries:normalized];
+    }
+    [[CacheManager sharedInstance] addCounts:counts];
+
+    [self alertWithMessage:@"User dictionary imported"
+              informative:[NSString stringWithFormat:
+                              @"%lu AutoCorrect entries and %lu learned words were added.",
+                              (unsigned long)[normalized count],
+                              (unsigned long)[counts count]]];
+}
+
+- (void)alertWithMessage:(NSString *)message informative:(NSString *)informative {
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:message];
+    [alert setInformativeText:informative];
+    [alert addButtonWithTitle:@"OK"];
+    [alert runModal];
+}
+
+- (void)startUpdater {    if (sUpdaterController != nil) {
         return;
     }
     // Updates are signed with Sparkle's EdDSA key (see SUPublicEDKey in

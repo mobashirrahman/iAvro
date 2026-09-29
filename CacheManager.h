@@ -31,6 +31,12 @@
 - (void)incrementCountForKey:(NSString*)aKey;
 - (void)forgetCountsForKey:(NSString*)aKey;
 
+// Snapshot for export, and a merge for import. Merging adds to the existing
+// count rather than replacing it, so importing a backup on a machine that
+// already has learning does not wipe it.
+- (NSDictionary*)countSnapshot;
+- (void)addCounts:(NSDictionary*)counts;
+
 // Phonetic Cahce (default for Array)
 - (NSArray*)arrayForKey:(NSString*)aKey;
 - (void)setArray:(NSArray*)anArray forKey:(NSString*)aKey;

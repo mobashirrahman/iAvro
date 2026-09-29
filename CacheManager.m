@@ -175,6 +175,26 @@ static CacheManager* sharedInstance = nil;
     [self schedulePersist];
 }
 
+- (NSDictionary*)countSnapshot {
+    return [[_countCache copy] autorelease];
+}
+
+- (void)addCounts:(NSDictionary*)counts {
+    if ([counts count] == 0) {
+        return;
+    }
+    for (NSString *word in counts) {
+        NSUInteger incoming = [[counts objectForKey:word] unsignedIntegerValue];
+        if (![word length] || incoming == 0) {
+            continue;
+        }
+        [_countCache setObject:[NSNumber numberWithUnsignedInteger:
+                                          [self countForKey:word] + incoming]
+                        forKey:word];
+    }
+    [self schedulePersist];
+}
+
 static const NSUInteger kPhoneticCacheLimit = 1000;
 static const NSUInteger kRecentBaseCacheLimit = 500;
 

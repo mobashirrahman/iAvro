@@ -149,6 +149,10 @@ static AutoCorrect* sharedInstance = nil;
     [self entriesDidChange];
 }
 
+- (NSDictionary *)userAutoCorrectEntries {
+    return [[_userEntries copy] autorelease];
+}
+
 - (void)deleteAutoCorrectForTerm:(NSString *)term {
     NSString *key = [[AvroParser sharedInstance] fix:term];
     if (!key || [key length] == 0) {
