@@ -36,7 +36,8 @@ expected, and it only happens once per machine:
 - **Right-click** `Avro Keyboard.app` → **Open** → **Open**, or
 - Open **System Settings → Privacy & Security** and click **"Open Anyway"**
 
-After that, macOS remembers the exception and updates install silently.
+After that, macOS remembers the exception **for that copy** of the app. If you
+install a newer version by downloading it, you approve that one the same way.
 
 > Building from source yourself avoids this entirely — a locally built app is
 > not quarantined. See below.
@@ -54,11 +55,60 @@ and type phonetically:
 | `bhalO` | ভালো |
 
 Press <kbd>Space</kbd> or <kbd>Enter</kbd> to accept the top candidate, arrow keys
-to move through the list. Useful options live in the input menu → **Preferences**:
+to move through the list, and <kbd>Esc</kbd> to undo a composition and get back
+the literal keystrokes you typed (`ami` instead of আমি).
+
+### It learns what you pick
+
+Pick a candidate that is not the first one and it is offered first the next time
+you type that term, ordered by how often you have chosen it. Your choices are
+kept in `~/Library/Application Support/OmicronLab/Avro Keyboard/` and can be
+exported and restored from the input menu (see below).
+
+### Typing English
+
+Terminals and editors receive plain English instead of Bangla — commands and
+code would otherwise be converted. This is on by default for Terminal, iTerm2,
+Warp, Alacritty, kitty, WezTerm, Ghostty, Xcode, VS Code, Sublime and the
+JetBrains IDEs.
+
+Any other application can be toggled from the input menu, where
+**Use English in *App*** reflects and changes the current application.
+
+### Input menu
+
+| Item | What it does |
+|---|---|
+| **About Avro Keyboard** | shows the version and build you are running |
+| **Check for Updates…** | checks the update feed |
+| **Use English in *App*** | toggles pass-through for the frontmost application |
+| **Export User Dictionary…** | writes your AutoCorrect entries and learned words to a text file |
+| **Import User Dictionary…** | restores them, adding to what is already there |
+| **Preferences…** | the options below |
+
+### Preferences
 
 - **Show Bengali inline while typing** — see the converted text as you type
 - **Enable AutoCorrect** — learn and apply your own replacements
 - **Enable Suggestions** — dictionary candidates beyond the literal conversion
+- **Suggest the typed English too** — offer your literal keystrokes as the last candidate
+- **Preselect exact transliteration** — prefer the plain conversion over the top dictionary word
+- **Classic mode (no suggestions)** — type without the suggestion window
+- **Browse suggestions with Tab** — Tab moves through candidates instead of committing
+- **Shift-\ ( | ) types a dot** — a lone `.` still types দাঁড়ি (।)
+
+The **AutoCorrect** tab edits the replacements, and **About** shows the version.
+
+### Updating
+
+Installed builds check the update feed automatically and offer new versions.
+Every release is signed with an EdDSA key, so updates are verified before they
+are installed.
+
+This build is not notarized, so a version you download and install manually needs
+approving again (step 4). Updates the app installs itself are not quarantined by
+the download process, so they should not prompt — but if you are ever asked,
+that is why.
 
 ## Building from Source
 

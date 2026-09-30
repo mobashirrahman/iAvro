@@ -4,7 +4,7 @@
 > build next*; `BUG_REPORT_AND_IMPROVEMENT_PLAN.md` records the defects found
 > and fixed, and `CHANGELOG.md` records what shipped.
 >
-> Updated: 2026-09-29. Branch: `fix/bug-series` (44 commits ahead of master).
+> Updated: 2026-09-29. Everything is on `master`; 2.0.9 is released.
 
 ## 1. Compatibility (settled)
 
@@ -27,7 +27,11 @@ auto-updates, because Sparkle signs its feed with its own EdDSA keys.
 | Data | 1,207 missing words added; 43.1% → 57.2% of the wordlist retrievable | `91e44af` |
 | User data | AutoCorrect overlay in Application Support; export/import | `dc33bd2`, `9a40768` |
 | Updates | Sparkle + EdDSA, tag-driven releases | `736e038`, `3c08d8e`, `049a5bf` |
-| Build | universal, hardened runtime, CI verifies binary and runs 155 checks | `8638f68`, `a29bf02` |
+| Build | universal, hardened runtime, CI verifies the binary and runs 205 checks | `8638f68`, `a29bf02` |
+| Typo tolerance | doubled letters, measured as the only class worth the cost | `06b5c2a` |
+| English pass-through | per-application, plus Esc to undo a composition | `c6ff334` |
+| Version display | About panel and Preferences | `d7b3e23` |
+| Auto-updates | feed published and verified end to end; EdDSA signed | `a976e0a`, `2.0.9` |
 
 ## 3. Rejected — do not build these
 
@@ -65,41 +69,68 @@ coverage direction is reopened.
 
 ## 5. Next, in order
 
-**Small and certain**
-1. **Forget all learning** — a menu item so the export is not a one-way door.
-2. **Document the new features** — import/export, learned ranking, auto-updates
-   are all absent from `README.md`.
-3. **Narrow typo tolerance** — only the two classes measured cheap: collapse a
-   doubled letter (`kothha` → `kotha`) and swap an adjacent pair
-   (`basngladesh` → `bangladesh`). 1–3 lookups, fired only when the exact
-   lookup returns nothing, results cached per term.
+**Documentation and small cleanups**
+1. **Forget all learning** — a menu item, so exporting is not a one-way door.
+2. **Guard the build number.** Sparkle compares `CFBundleVersion`, not the
+   version string. A tag is checked against the string but nothing checks the
+   build number, and forgetting to bump it means no update is ever offered.
 
-**Medium effort, real UX**
-4. **Candidate UX** — number-key select, Esc-to-revert, Page Up/Down paging,
-   inline highlight. Confirmed absent: no `handleEvent:`, no paging, no number
-   select.
-5. **Per-app English mode** — remember ASCII-only apps (Terminal, Xcode) and
-   pass straight through, as Squirrel and the Japanese IME do. No
-   `NSWorkspace` usage exists yet.
-6. **Next-word prediction** — bigrams from commits we already log, offered
-   after commit. The data is already on disk from the ranking work.
+**Typing quality**
+3. **Documented gaps in the dictionary.** `শুন্ন`, `ধাকা` and others are absent
+   from every bundled source, so they cannot be recovered from `autodict.plist`.
+   Needs an external wordlist.
+4. **Parse round-trip mismatches.** Most words that are present but
+   unreachable fail because the typed roman parses to a different Bangla string
+   than the wordlist stored (`file` → `ফাইল`). Worth more than the 1,207 words
+   already added, and shelved deliberately.
+5. **Next-word prediction** — bigrams from commits already recorded. The data
+   is on disk from the ranking work.
 
-**Larger**
+**Typing experience**
+6. **Number-key candidate selection and paging.** Esc-to-revert and Tab
+   browsing already exist; this is the rest of the convention.
 7. **Morphology** — prefix, compound and multi-suffix segmentation. The
    hardcoded `ch`/`oto` patches are gone; principled segmentation is not done.
-8. **Database lazy-load** — the full 160k-word dictionary is still read at
-   launch; a real startup and memory cost.
 
-**Process risks, not features**
-9. **Open a PR.** 44 commits are unreviewed on a branch.
-10. **Manual smoke test.** Nothing has been typed in a live input session; the
-    controller tests mirror the real logic rather than driving it.
+**Performance**
+8. **Database lazy-load.** The full 160k-word dictionary is still read at
+   launch. Improves startup and memory, not per-keystroke latency, because the
+   cost is regex scanning in memory and the parsed form is not expressible as a
+   simple SQL lookup.
 
-## 6. Maintaining this file
+**Verification, still outstanding**
+9. **A live input session has never been typed in.** The controller tests
+   mirror the real logic rather than driving `IMKInputController`. `TESTING.md`
+   is the plan; section J (per-application English mode) is the highest risk.
+10. **Sparkle's install step** has not run in a live app. Everything up to it is
+    verified: the feed is published, announces the right build, and its
+    signature matches the released asset.
+
+## 6. Release process
+
+Releases are cut by pushing a version tag:
+
+```sh
+# bump CFBundleShortVersionString and CFBundleVersion in Info.plist, and add a
+# CHANGELOG.md section for the version, then:
+git tag -a vX.Y.Z && git push origin vX.Y.Z
+```
+
+CI builds universally, signs the archive with EdDSA, generates the feed with
+Sparkle's `generate_appcast`, attaches both to the release, and publishes the
+feed to the `appcast` branch. The release is rejected if the tag disagrees with
+`CFBundleShortVersionString`, if the changelog has no section, or if the
+published feed does not announce the build.
+
+Both numbers matter: the string is checked against the tag, and the build number
+is what Sparkle compares to decide whether an update is offered.
+
+## 7. Maintaining this file
 
 Regenerate the coverage figures with:
 
 ```sh
-Tests/measure_coverage_rate.m      # retrievable share, with/without extra words
-tools/build_extra_words.py --check # fails if the word list is stale
+Tests/run_tests.sh                  # 205 checks over the logic
+tools/build_extra_words.py --check  # fails if the word list is stale
+python3 tools/release_notes.py X.Y.Z # release notes for a version
 ```
