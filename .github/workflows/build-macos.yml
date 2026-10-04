@@ -230,6 +230,27 @@ jobs:
           echo "SHORT=$SHORT" >> "$GITHUB_ENV"
           echo "BUILD=$BUILD" >> "$GITHUB_ENV"
 
+      # Sparkle decides whether an update is offered by comparing CFBundleVersion,
+      # not the version string, so a release whose build number did not increase
+      # would publish successfully and then never be offered to anyone.
+      - name: Check build number increased since the last release
+        run: |
+          set -euo pipefail
+          CURRENT=$(python3 -c 'import plistlib; print(plistlib.load(open("Info.plist","rb"))["CFBundleVersion"])')
+          PREV_TAG=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}~1" 2>/dev/null || true)
+          if [ -z "$PREV_TAG" ]; then
+            echo "::notice::No previous release tag; nothing to compare against"
+            exit 0
+          fi
+          PREV=$(git show "$PREV_TAG:Info.plist" | python3 -c 'import plistlib,sys; print(plistlib.loads(sys.stdin.buffer.read())["CFBundleVersion"])')
+          echo "previous $PREV_TAG build=$PREV  this release build=$CURRENT"
+          if [ "$CURRENT" -le "$PREV" ]; then
+            echo "::error::CFBundleVersion ($CURRENT) is not greater than $PREV_TAG ($PREV)."
+            echo "Sparkle would never offer this release. Bump CFBundleVersion in Info.plist."
+            exit 1
+          fi
+          echo "OK: build number increased $PREV -> $CURRENT"
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
