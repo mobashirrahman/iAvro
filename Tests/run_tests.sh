@@ -54,6 +54,10 @@ SOURCES=(
   "$REPO_ROOT/TypoCorrections.m"
   "$REPO_ROOT/LanguageMode.m"
   "$REPO_ROOT/VersionInfo.m"
+  "$REPO_ROOT/Tests/MockClient.m"
+  "$REPO_ROOT/Tests/TestableController.m"
+  "$REPO_ROOT/AvroKeyboardController.m"
+  "$REPO_ROOT/Candidates.m"
   "$REPO_ROOT/Pods/RegexKitLite/RegexKitLite-4.0/RegexKitLite.m"
   "$REPO_ROOT/Pods/FMDB/src/fmdb/FMDatabase.m"
   "$REPO_ROOT/Pods/FMDB/src/fmdb/FMDatabaseAdditions.m"
@@ -71,6 +75,7 @@ TESTS=(
   test_typo_corrections
   test_language_mode
   test_version_display
+  test_integration
 )
 
 COMMON_FLAGS=(
@@ -82,6 +87,7 @@ COMMON_FLAGS=(
   -framework AppKit
   -lsqlite3
   -licucore
+  -framework InputMethodKit
 )
 
 echo "SDK:         $SDK_PATH"
