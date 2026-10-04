@@ -10,6 +10,32 @@ Notable changes, newest first. Version numbers follow `CFBundleShortVersionStrin
   Digits typed into a composition that already contains one (ordinals like
   "11th") stay input, and so does 0, since there is no candidate 0.
 
+## 2.1.0
+
+### Added
+- **Number keys select candidates.** While the candidate list is showing,
+  pressing 1–9 commits that candidate. Digits typed into a composition that
+  already contains one (ordinals like "11th") stay input, as does 0.
+- **The release refuses a stale build number.** Sparkle compares
+  `CFBundleVersion`, not the version string, so the release job now fails
+  unless the build number increased since the previous release.
+
+### Fixed
+- **Unhandled commands orphaned the composition.** A Cmd/Ctrl shortcut or
+  function key arriving mid-composition passed through with the text still on
+  screen, so the next keystroke appended to it. The composition is now
+  committed first.
+- **A new session could inherit a stale composition.** Activating the input
+  method now drops any leftover buffer, candidates and parsed parts instead of
+  appending to them.
+- **Corrupt data files killed the input method.** Both parsers threw from
+  `-init` on missing or unparsable JSON. They now degrade to passthrough, and
+  the dictionary search degrades to empty.
+
+### Changed
+- Integration tests drive the real input controller against a mock client
+  (64 checks), replacing mirrored logic that could drift silently.
+
 ## 2.0.9
 
 This release exists so that an installed 2.0.8 has something to update to: it is
