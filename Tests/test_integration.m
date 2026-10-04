@@ -248,8 +248,35 @@ static void testToggleFlipsStoredMode(void) {
   [LanguageMode clearOverrideForBundleIdentifier:@"com.test.editor"];
 }
 
-static void testDeactivateIsSafe(void) {
-  SECTION("deactivate with composition in flight");
+static void testActivateClearsStaleState(void) {
+  SECTION("activate clears a stale composition");
+  MockClient *m = [[[MockClient alloc] init] autorelease];
+  AvroKeyboardController *c = NewPlainController(m);
+  SetDefaults(YES, NO);
+
+  TypeString(c, m, @"am");
+  CHECK([Composed(c, m) length] > 0, "composition in flight");
+  CHECK([[c candidates:m] count] > 0, "candidates in flight");
+
+  BOOL crashed = NO;
+  @try {
+    [c activateServer:m];
+  } @catch (NSException *e) {
+    crashed = YES;
+  }
+  CHECK(!crashed, "activate does not raise");
+  CHECK([Composed(c, m) length] == 0, "composition buffer cleared");
+  CHECK([[c candidates:m] count] == 0, "candidate list cleared");
+  CHECK(c.prefix == nil && c.term == nil && c.suffix == nil,
+        "parsed parts cleared");
+  CHECK([[m committed] length] == 0, "stale text is dropped, not committed");
+
+  // A fresh session works immediately after.
+  TypeString(c, m, @"ko");
+  CHECK([Composed(c, m) length] > 0, "new composition starts cleanly");
+}
+
+static void testDeactivateIsSafe(void) {  SECTION("deactivate with composition in flight");
   MockClient *m = [[[MockClient alloc] init] autorelease];
   AvroKeyboardController *c = NewPlainController(m);
   SetDefaults(YES, NO);
@@ -286,6 +313,7 @@ int main(int argc, char *argv[]) {
     testEnglishModeSwitchCommitsFirst();
     testToggleFlipsStoredMode();
     testDeactivateIsSafe();
+    testActivateClearsStaleState();
   }
   int rc = test_report("test_integration");
   [pool release];

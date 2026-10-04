@@ -337,6 +337,22 @@ static const NSInteger kEnglishModeMenuItemTag = 100;
     }
 }
 
+- (void)activateServer:(id)sender {
+    [super activateServer:sender];
+    // Nothing can legitimately be in flight for a client that is only now
+    // becoming active: a previous session may have been interrupted without a
+    // matching deactivate (client crash, force-quit, fast app switch). Without
+    // this, the next keystroke appends to a stale composition.
+    [self clearCompositionBuffer];
+    [_currentCandidates removeAllObjects];
+    [self setPrefix:nil];
+    [self setTerm:nil];
+    [self setSuffix:nil];
+    _prevSelected = -1;
+    _selectedCandidateIndex = 0;
+    [self updateCandidatesPanel];
+}
+
 - (void)deactivateServer:(id)sender {
     // Flush any pending debounced save when the user switches away
     if ([[NSUserDefaults standardUserDefaults] boolForKey:@"IncludeDictionary"]) {
