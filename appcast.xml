@@ -1,0 +1,14 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Avro Keyboard</title>
+        <item>
+            <title>2.1.0</title>
+            <pubDate>Sun, 04 Oct 2026 04:43:44 +0000</pubDate>
+            <sparkle:version>10</sparkle:version>
+            <sparkle:shortVersionString>2.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/mobashirrahman/iAvro/releases/download/v2.1.0/AvroKeyboard-macOS.zip" length="3222096" type="application/octet-stream" sparkle:edSignature="x2ZPy3MHn0Lr52vdIoOnh7F3OWFNB+TwW1J5f7KwYNUMW6IVoYv4Z8mn2dht1QuNvt7GZ19o/m/SiN2WicxRDQ=="/>
+        </item>
+    </channel>
+</rss>
