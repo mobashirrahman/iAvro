@@ -47,43 +47,60 @@ static AvroParser* sharedInstance = nil;
     return NSUIntegerMax;  // This is sooo not zero
 }
 
+static NSString *AvroNonNilString(id value) {
+    return [value isKindOfClass:[NSString class]] ? value : @"";
+}
+
+- (NSDictionary *)loadTableDictionary {
+    NSString *filePath = [[NSBundle mainBundle] pathForResource:@"data" ofType:@"json"];
+    if (!filePath) {
+        return nil;
+    }
+    NSData *jsonData = [NSData dataWithContentsOfFile:filePath
+                                              options:NSDataReadingUncached
+                                                error:NULL];
+    if (!jsonData) {
+        return nil;
+    }
+    id table = [NSJSONSerialization JSONObjectWithData:jsonData
+                                               options:0
+                                                 error:NULL];
+    return [table isKindOfClass:[NSDictionary class]] ? table : nil;
+}
+
 - (id)init {
     self = [super init];
     if (self) {
-        NSError *error = nil;
-        NSString *filePath = [[NSBundle mainBundle] pathForResource:@"data" ofType:@"json"];
-        NSData *jsonData = [NSData dataWithContentsOfFile:filePath options:NSDataReadingUncached error: &error];
-
-        if (jsonData) {
-
-            NSDictionary *jsonArray = [NSJSONSerialization JSONObjectWithData: jsonData options: NSJSONReadingMutableContainers error: &error];
-
-            if (!jsonArray) {
-                @throw error;
-                // @throw [NSException exceptionWithName:@"AvroParser init" reason:@"Error parsing JSON" userInfo:nil];
-            } else {
-                _vowel = [[NSString alloc] initWithString:[jsonArray objectForKey:@"vowel"]];
-                _consonant = [[NSString alloc] initWithString:[jsonArray objectForKey:@"consonant"]];
-                _number = [[NSString alloc] initWithString:[jsonArray objectForKey:@"number"]];
-                _casesensitive = [[NSString alloc] initWithString:[jsonArray objectForKey:@"casesensitive"]];
-                _patterns = [[NSArray alloc] initWithArray:[jsonArray objectForKey:@"patterns"]];
-                _maxPatternLength = [[[_patterns objectAtIndex:0] objectForKey:@"find"] length];
-                // Order-independent lookup: the table is not in valid
-                // binary-search order, so build a hash index (last duplicate
-                // wins, matching previous observable behavior).
-                NSMutableDictionary *patternDict = [[NSMutableDictionary alloc] initWithCapacity:[_patterns count]];
-                for (NSDictionary *entry in _patterns) {
-                    NSString *key = [entry objectForKey:@"find"];
-                    if (key) {
-                        [patternDict setObject:entry forKey:key];
-                    }
-                }
-                _patternDict = patternDict;
-            }
-
-        } else {
-            @throw error;
+        NSDictionary *jsonArray = [self loadTableDictionary];
+        if (!jsonArray) {
+            // Missing or corrupt table: degrade to passthrough instead of
+            // throwing, which would kill the input method on every launch.
+            NSLog(@"AvroParser: data.json missing or corrupt; transliteration disabled");
+            jsonArray = [NSDictionary dictionary];
         }
+        _vowel = [[NSString alloc] initWithString:AvroNonNilString([jsonArray objectForKey:@"vowel"])];
+        _consonant = [[NSString alloc] initWithString:AvroNonNilString([jsonArray objectForKey:@"consonant"])];
+        _number = [[NSString alloc] initWithString:AvroNonNilString([jsonArray objectForKey:@"number"])];
+        _casesensitive = [[NSString alloc] initWithString:AvroNonNilString([jsonArray objectForKey:@"casesensitive"])];
+        id rawPatterns = [jsonArray objectForKey:@"patterns"];
+        _patterns = [[NSArray alloc] initWithArray:([rawPatterns isKindOfClass:[NSArray class]]
+                                                    ? rawPatterns : [NSArray array])];
+        id firstFind = [_patterns count] > 0 ? [[_patterns objectAtIndex:0] objectForKey:@"find"] : nil;
+        _maxPatternLength = [firstFind isKindOfClass:[NSString class]] ? [firstFind length] : 0;
+        // Order-independent lookup: the table is not in valid
+        // binary-search order, so build a hash index (last duplicate
+        // wins, matching previous observable behavior).
+        NSMutableDictionary *patternDict = [[NSMutableDictionary alloc] initWithCapacity:[_patterns count]];
+        for (id entry in _patterns) {
+            if (![entry isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            NSString *key = [entry objectForKey:@"find"];
+            if ([key isKindOfClass:[NSString class]]) {
+                [patternDict setObject:entry forKey:key];
+            }
+        }
+        _patternDict = patternDict;
     }
     return self;
 }

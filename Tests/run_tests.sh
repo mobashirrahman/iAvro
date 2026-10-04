@@ -76,6 +76,7 @@ TESTS=(
   test_language_mode
   test_version_display
   test_integration
+  test_quarantine
 )
 
 COMMON_FLAGS=(

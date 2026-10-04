@@ -47,41 +47,59 @@ static RegexParser* sharedInstance = nil;
     return NSUIntegerMax;  // This is sooo not zero
 }
 
+static NSString *RegexNonNilString(id value) {
+    return [value isKindOfClass:[NSString class]] ? value : @"";
+}
+
+- (NSDictionary *)loadTableDictionary {
+    NSString *filePath = [[NSBundle mainBundle] pathForResource:@"regex" ofType:@"json"];
+    if (!filePath) {
+        return nil;
+    }
+    NSData *jsonData = [NSData dataWithContentsOfFile:filePath
+                                              options:NSDataReadingUncached
+                                                error:NULL];
+    if (!jsonData) {
+        return nil;
+    }
+    id table = [NSJSONSerialization JSONObjectWithData:jsonData
+                                               options:0
+                                                 error:NULL];
+    return [table isKindOfClass:[NSDictionary class]] ? table : nil;
+}
+
 - (id)init {
     self = [super init];
     if (self) {
-        NSError *error = nil;
-        NSString *filePath = [[NSBundle mainBundle] pathForResource:@"regex" ofType:@"json"];
-        NSData *jsonData = [NSData dataWithContentsOfFile:filePath options:NSDataReadingUncached error: &error];
-        
-        if (jsonData) {
-            
-            NSDictionary *jsonArray = [NSJSONSerialization JSONObjectWithData:jsonData options:NSJSONReadingMutableContainers error: &error];
-            
-            if (!jsonArray) {
-                @throw error;
-            } else {
-                _vowel = [[NSString alloc] initWithString:[jsonArray objectForKey:@"vowel"]];
-                _consonant = [[NSString alloc] initWithString:[jsonArray objectForKey:@"consonant"]];
-                _casesensitive = [[NSString alloc] initWithString:[jsonArray objectForKey:@"casesensitive"]];
-                _patterns = [[NSArray alloc] initWithArray:[jsonArray objectForKey:@"patterns"]];
-                _maxPatternLength = [[[_patterns objectAtIndex:0] objectForKey:@"find"] length];
-                // Order-independent lookup: the table is not guaranteed to be
-                // in valid binary-search order, so build a hash index (last
-                // duplicate wins, matching previous observable behavior).
-                NSMutableDictionary *patternDict = [[NSMutableDictionary alloc] initWithCapacity:[_patterns count]];
-                for (NSDictionary *entry in _patterns) {
-                    NSString *key = [entry objectForKey:@"find"];
-                    if (key) {
-                        [patternDict setObject:entry forKey:key];
-                    }
-                }
-                _patternDict = patternDict;
-            }
-            
-        } else {
-            @throw error;
+        NSDictionary *jsonArray = [self loadTableDictionary];
+        if (!jsonArray) {
+            // Same contract as AvroParser: a missing or corrupt table
+            // degrades to passthrough instead of killing the input method.
+            NSLog(@"RegexParser: regex.json missing or corrupt; dictionary search disabled");
+            jsonArray = [NSDictionary dictionary];
         }
+        _vowel = [[NSString alloc] initWithString:RegexNonNilString([jsonArray objectForKey:@"vowel"])];
+        _consonant = [[NSString alloc] initWithString:RegexNonNilString([jsonArray objectForKey:@"consonant"])];
+        _casesensitive = [[NSString alloc] initWithString:RegexNonNilString([jsonArray objectForKey:@"casesensitive"])];
+        id rawPatterns = [jsonArray objectForKey:@"patterns"];
+        _patterns = [[NSArray alloc] initWithArray:([rawPatterns isKindOfClass:[NSArray class]]
+                                                    ? rawPatterns : [NSArray array])];
+        id firstFind = [_patterns count] > 0 ? [[_patterns objectAtIndex:0] objectForKey:@"find"] : nil;
+        _maxPatternLength = [firstFind isKindOfClass:[NSString class]] ? [firstFind length] : 0;
+        // Order-independent lookup: the table is not guaranteed to be
+        // in valid binary-search order, so build a hash index (last
+        // duplicate wins, matching previous observable behavior).
+        NSMutableDictionary *patternDict = [[NSMutableDictionary alloc] initWithCapacity:[_patterns count]];
+        for (id entry in _patterns) {
+            if (![entry isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            NSString *key = [entry objectForKey:@"find"];
+            if ([key isKindOfClass:[NSString class]]) {
+                [patternDict setObject:entry forKey:key];
+            }
+        }
+        _patternDict = patternDict;
     }
     return self;
 }
