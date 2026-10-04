@@ -2,6 +2,14 @@
 
 Notable changes, newest first. Version numbers follow `CFBundleShortVersionString`.
 
+## Unreleased
+
+### Added
+- **Number keys select candidates.** While the candidate list is showing,
+  pressing 1–9 commits that candidate, as in other mature input methods.
+  Digits typed into a composition that already contains one (ordinals like
+  "11th") stay input, and so does 0, since there is no candidate 0.
+
 ## 2.0.9
 
 This release exists so that an installed 2.0.8 has something to update to: it is

@@ -34,8 +34,8 @@ static const NSInteger kEnglishModeMenuItemTag = 100;
 - (BOOL)isEnglishModeActive;
 - (NSString *)currentBundleIdentifier;
 - (void)removeEnglishModeMenuItemFromMenu:(NSMenu *)menu;
+- (BOOL)shouldSelectCandidateWithDigit;
 @end
-
 @implementation AvroKeyboardController
 
 @synthesize prefix = _prefix, term = _term, suffix = _suffix;
@@ -450,7 +450,20 @@ static const NSInteger kEnglishModeMenuItemTag = 100;
         }
         return NO;
     }
-    else {
+    if ([string length] == 1) {
+        unichar ch = [string characterAtIndex:0];
+        if (ch >= '1' && ch <= '9' && [self shouldSelectCandidateWithDigit]) {
+            NSUInteger idx = (NSUInteger)(ch - '1');
+            if (idx < [_currentCandidates count]) {
+                [self candidateSelected:[_currentCandidates objectAtIndex:idx]];
+            } else {
+                NSBeep();
+            }
+            return YES;
+        }
+        // Anything else falls through to normal input below.
+    }
+    {
         if ([string isEqualToString:@"|"] &&
             [[NSUserDefaults standardUserDefaults] boolForKey:kPipeToDotDefaultsKey]) {
             // Windows Avro option: Avro's literal-dot syntax, since "." alone is দাঁড়ি
@@ -625,6 +638,24 @@ static const NSInteger kEnglishModeMenuItemTag = 100;
     if (item) {
         [menu removeItem:item];
     }
+}
+
+// Digits double as candidate shortcuts while a list is showing, the way mature
+// IMEs work. The escape hatch: once the composition itself contains a digit
+// (ordinals like "11th" start with one), digits go back to being input, because
+// there is no way to tell "select #1" from "type the second 1". Zero never
+// selects; there is no candidate 0.
+- (BOOL)shouldSelectCandidateWithDigit {
+    if (!_currentCandidates || [_currentCandidates count] == 0) {
+        return NO;
+    }
+    for (NSUInteger i = 0; i < [_composedBuffer length]; i++) {
+        unichar c = [_composedBuffer characterAtIndex:i];
+        if (c >= '0' && c <= '9') {
+            return NO;
+        }
+    }
+    return YES;
 }
 
 // The client tells us which application is hosting this session, so the choice

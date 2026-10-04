@@ -316,6 +316,64 @@ static void testUnhandledCommandCommitsFirst(void) {
   CHECK([Composed(c2, m2) length] == 0, "nothing left composing");
 }
 
+static void testNumberSelectsCandidate(void) {
+  SECTION("number keys select candidates");
+  MockClient *m = [[[MockClient alloc] init] autorelease];
+  AvroKeyboardController *c = NewPlainController(m);
+  SetDefaults(YES, YES);
+
+  TypeString(c, m, @"kora");
+  NSArray *list = [c candidates:m];
+  if ([list count] > 1) {
+    NSString *second = [list objectAtIndex:1];
+    CHECK([c inputText:@"2" client:m] == YES, "digit is consumed, not typed");
+    CHECK([[m committed] isEqualToString:second],
+          "pressing 2 commits the second candidate");
+    CHECK([Composed(c, m) length] == 0, "composition cleared after commit");
+  } else {
+    CHECK(NO, "kora offers several candidates");
+  }
+}
+
+static void testNumberOutOfRangeBeeps(void) {
+  SECTION("out-of-range digit does not commit");
+  MockClient *m = [[[MockClient alloc] init] autorelease];
+  AvroKeyboardController *c = NewPlainController(m);
+  // Dictionary off: the only candidate is the literal parse, so any digit
+  // other than 1 is out of range no matter how the dictionary changes.
+  SetDefaults(YES, NO);
+
+  TypeString(c, m, @"ami");
+  NSArray *list = [c candidates:m];
+  CHECK([list count] == 1, "exactly one candidate");
+  CHECK([c inputText:@"2" client:m] == YES, "digit is consumed");
+  CHECK([[m committed] length] == 0, "nothing committed");
+  CHECK([Composed(c, m) length] > 0, "composition continues");
+}
+
+static void testDigitsInCompositionStayInput(void) {
+  SECTION("digits inside a composition stay input");
+  MockClient *m = [[[MockClient alloc] init] autorelease];
+  AvroKeyboardController *c = NewPlainController(m);
+  SetDefaults(YES, YES);
+
+  // Ordinals start with a digit: the first one is typed, the rest must be too.
+  CHECK([c inputText:@"1" client:m] == YES, "leading digit is typed");
+  NSString *afterFirst = Composed(c, m);
+  CHECK([c inputText:@"1" client:m] == YES, "second digit is also typed");
+  NSString *afterSecond = Composed(c, m);
+  CHECK([afterSecond length] > [afterFirst length],
+        "the second digit extends the composition instead of selecting");
+
+  // Zero never selects: there is no candidate 0.
+  MockClient *m2 = [[[MockClient alloc] init] autorelease];
+  AvroKeyboardController *c2 = NewPlainController(m2);
+  TypeString(c2, m2, @"ami");
+  CHECK([c2 inputText:@"0" client:m2] == YES, "zero is consumed as input");
+  CHECK([[m2 committed] length] == 0, "zero commits nothing");
+  CHECK([Composed(c2, m2) length] > 0, "composition continues after zero");
+}
+
 int main(int argc, char *argv[]) {
   NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 
@@ -339,6 +397,9 @@ int main(int argc, char *argv[]) {
     testToggleFlipsStoredMode();
     testDeactivateIsSafe();
     testActivateClearsStaleState();
+    testNumberSelectsCandidate();
+    testNumberOutOfRangeBeeps();
+    testDigitsInCompositionStayInput();
     testUnhandledCommandCommitsFirst();
   }
   int rc = test_report("test_integration");
