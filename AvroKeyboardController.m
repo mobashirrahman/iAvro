@@ -546,29 +546,33 @@ static const NSInteger kEnglishModeMenuItemTag = 100;
 }
 
 - (BOOL)didCommandBySelector:(SEL)aSelector client:(id)sender {
-    if ([self respondsToSelector:aSelector]) {
-		// The NSResponder methods like insertNewline: or deleteBackward: are
-		// methods that return void. didCommandBySelector method requires
-		// that you return YES if the command is handled and NO if you do not. 
-		// This is necessary so that unhandled commands can be passed on to the
-		// client application. For that reason we need to test in the case where
-		// we might not handle the command.
-		
-		if (_composedBuffer && [_composedBuffer length] > 0) {
-            if (aSelector == @selector(insertTab:)
-                || (aSelector == @selector(insertBacktab:) &&
-                    [[NSUserDefaults standardUserDefaults] boolForKey:kTabBrowsingDefaultsKey])
-                || aSelector == @selector(insertNewline:)
-                || aSelector == @selector(cancelOperation:)
-                || aSelector == @selector(deleteBackward:)
-                || aSelector == @selector(moveLeft:)
-                || aSelector == @selector(moveRight:)
-                || aSelector == @selector(moveUp:)
-                || aSelector == @selector(moveDown:)) {
-                [self performSelector:aSelector withObject:sender];
-                return YES;
-            }
+    // The NSResponder methods like insertNewline: or deleteBackward: are
+    // methods that return void. didCommandBySelector method requires
+    // that you return YES if the command is handled and NO if you do not.
+    // This is necessary so that unhandled commands can be passed on to the
+    // client application. For that reason we need to test in the case where
+    // we might not handle the command.
+
+    if (_composedBuffer && [_composedBuffer length] > 0) {
+        if ([self respondsToSelector:aSelector] &&
+            (aSelector == @selector(insertTab:)
+             || (aSelector == @selector(insertBacktab:) &&
+                 [[NSUserDefaults standardUserDefaults] boolForKey:kTabBrowsingDefaultsKey])
+             || aSelector == @selector(insertNewline:)
+             || aSelector == @selector(cancelOperation:)
+             || aSelector == @selector(deleteBackward:)
+             || aSelector == @selector(moveLeft:)
+             || aSelector == @selector(moveRight:)
+             || aSelector == @selector(moveUp:)
+             || aSelector == @selector(moveDown:))) {
+            [self performSelector:aSelector withObject:sender];
+            return YES;
         }
+        // Anything else (Cmd/Ctrl shortcuts, function keys, noop:) used to
+        // pass through with the composition still on screen, orphaning it:
+        // the next keystroke would append to text the user thought was gone.
+        // Commit what was typed first, then let the key through.
+        [self commitComposition:sender];
     }
 	return NO;
 }

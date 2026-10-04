@@ -291,6 +291,31 @@ static void testDeactivateIsSafe(void) {  SECTION("deactivate with composition i
   CHECK(!crashed, "deactivate does not raise");
 }
 
+static void testUnhandledCommandCommitsFirst(void) {
+  SECTION("unhandled command commits first, then passes through");
+  MockClient *m = [[[MockClient alloc] init] autorelease];
+  AvroKeyboardController *c = NewPlainController(m);
+  SetDefaults(YES, NO);
+
+  TypeString(c, m, @"am");
+  // copy: is not implemented by the controller: a Cmd key that maps to it
+  // must not leave the composition orphaned on screen.
+  BOOL claimed = [c didCommandBySelector:@selector(copy:) client:m];
+  CHECK(claimed == NO, "the key itself still passes through");
+  CHECK([Composed(c, m) length] == 0, "composition is not left orphaned");
+  CHECK([[m committed] isEqualToString:@"আম"],
+        "what was typed is committed first");
+
+  // Same for a selector the controller does implement but that is not a
+  // text-editing command.
+  MockClient *m2 = [[[MockClient alloc] init] autorelease];
+  AvroKeyboardController *c2 = NewPlainController(m2);
+  TypeString(c2, m2, @"am");
+  CHECK([c2 didCommandBySelector:@selector(noop:) client:m2] == NO,
+        "noop: passes through");
+  CHECK([Composed(c2, m2) length] == 0, "nothing left composing");
+}
+
 int main(int argc, char *argv[]) {
   NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 
@@ -314,6 +339,7 @@ int main(int argc, char *argv[]) {
     testToggleFlipsStoredMode();
     testDeactivateIsSafe();
     testActivateClearsStaleState();
+    testUnhandledCommandCommitsFirst();
   }
   int rc = test_report("test_integration");
   [pool release];
